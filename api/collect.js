@@ -44,17 +44,22 @@ export default async function handler(req, res) {
       return res.status(200).json({ 목록: s.done ? "한 바퀴 끝" : "이어서 계속", ...s, 다음시도: SIDOS[s.i] || null });
     }
     if (q.mode === "detail") {
-      let d = await getState("detail"); if (d.day !== today()) d = { day: today(), calls: 0, done: 0, errors: 0 };
+      let d = await getState("detail"); if (d.day !== today() || q.reset === "1") d = { day: today(), calls: 0, done: 0, errors: 0 };
       if (d.calls >= DAILY_DETAIL) return res.status(200).json({ 상세: "오늘 한도까지 했어요", ...d });
       const old = new Date(Date.now() - 30 * 864e5).toISOString();
       let worked = 0;
       for (const kind of PRIORITY) {
         while (left() > 10000 && d.calls < DAILY_DETAIL) {
-          const rows = await sb("GET", `ltc_insts?select=sym,pttn,kind&kind=eq.${kind}&or=(detail_at.is.null,detail_at.lt.${old})&order=detail_at.asc.nullsfirst&limit=8`);
+          const rows = await sb("GET", `ltc_insts?select=sym,pttn,kind&kind=eq.${kind}&or=(detail_at.is.null,detail_at.lt.${old})&order=detail_at.asc.nullsfirst&limit=3`);
           if (!rows.length) break;
           const outs = await Promise.all(rows.map(async (r) => {
             try { const x = await detail(r.sym, r.pttn, r.kind); d.calls += x.calls; return { ...r, ...x.row }; }
-            catch (e) { d.errors++; d.calls += 2; if (/한도/.test(e.message)) d.calls = DAILY_DETAIL; return { ...r, detail_at: new Date().toISOString(), detail_err: e.message.slice(0, 200) }; }
+            catch (e) {
+              d.errors++; d.calls += 2; d.lastErr = e.message.slice(0, 120);
+              if (/오늘 호출 한도/.test(e.message)) d.calls = DAILY_DETAIL;
+              // 실패한 곳은 내일 다시 받도록 (29일 전으로 표시)
+              return { ...r, detail_at: new Date(Date.now() - 29 * 864e5).toISOString(), detail_err: e.message.slice(0, 200) };
+            }
           }));
           for (const o of outs) { const { sym, pttn, kind: _k, ...patch } = o; await sb("PATCH", `ltc_insts?sym=eq.${sym}&pttn=eq.${encodeURIComponent(pttn)}`, patch, { Prefer: "return=minimal" }); }
           d.done += outs.length; worked += outs.length;
