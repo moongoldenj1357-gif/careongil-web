@@ -34,6 +34,14 @@ select,input[type=search]{width:100%;padding:11px 12px;border:1px solid var(--li
 .chip[aria-pressed=true]{background:var(--main);border-color:var(--main);color:#fff}
 .go{width:100%;margin-top:12px;padding:13px;border:0;border-radius:10px;background:var(--main);color:#fff;font-weight:700;font-size:1.05rem;cursor:pointer}
 .go:hover{filter:brightness(1.08)}
+.near{width:100%;margin-top:8px;padding:11px;border:1px solid var(--main);border-radius:10px;background:#fff;color:var(--main);font-weight:600;cursor:pointer}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-left:auto}
+.seg button{border:0;background:#fff;padding:6px 14px;cursor:pointer}.seg button[aria-pressed=true]{background:var(--main);color:#fff}
+#mapBox{height:460px;border-radius:var(--r);overflow:hidden;border:1px solid var(--line);margin-bottom:12px;background:#eef0ec}
+#dmap{display:none;height:200px;border-radius:10px;overflow:hidden;margin-bottom:10px}
+.mbub{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 10px;box-shadow:0 4px 14px rgba(0,0,0,.15);font-size:.85rem;line-height:1.4;max-width:220px}
+.mbub .btn{padding:3px 8px;margin-top:4px;font-size:.8rem}
+.me{background:var(--warm);color:#fff;border-radius:999px;padding:3px 9px;font-size:.78rem;font-weight:700}
 #nav{display:flex;gap:6px;margin-top:16px;flex-wrap:wrap}
 #nav button{border:0;background:rgba(255,255,255,.14);color:#fff;border-radius:999px;padding:7px 14px;cursor:pointer}
 #nav button[aria-current=page]{background:#fff;color:var(--main);font-weight:700}
@@ -130,9 +138,12 @@ footer p{margin:4px 0}
     <label class="f" for="q">기관 이름 (선택)</label>
     <input type="search" id="q" placeholder="예: 행복요양원" maxlength="30">
     <button class="go" type="submit">찾기</button>
+    <button class="near" type="button" id="near">📍 내 주변 찾기</button>
   </form>
 
-  <div class="meta"><h2 id="count">지역을 고르고 찾기를 눌러 주세요</h2><span class="muted" id="hint"></span></div>
+  <div class="meta"><h2 id="count">지역을 고르고 찾기를 눌러 주세요</h2><span class="muted" id="hint"></span>
+    <span class="seg"><button type="button" id="vList" aria-pressed="true">목록</button><button type="button" id="vMap" aria-pressed="false">지도</button></span></div>
+  <div id="mapBox" hidden></div>
   <div class="list" id="list"></div>
   <div class="pager" id="pager"></div>
 </main>
@@ -374,6 +385,7 @@ async function search(scroll) {
       `<button class="btn" type="button" data-page="${j.page - 1}" ${j.page <= 1 ? "disabled" : ""}>‹ 이전</button>
        <span class="muted">${j.page} / ${j.pages}</span>
        <button class="btn" type="button" data-page="${j.page + 1}" ${j.page >= j.pages ? "disabled" : ""}>다음 ›</button>`;
+    if (mapView) drawBigMap(j.rows);
     if (scroll) $(".meta").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (e) {
     $("#count").textContent = "불러오지 못했어요";
@@ -457,13 +469,14 @@ async function openDetail(id) {
       ["자료 기준", r.detail_at ? day(r.detail_at) + " 공단 자료" : "–"],
     ];
     const picked = picks.includes(r.id);
-    show(r.name, `<table class="kv">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join("")}</table>
+    show(r.name, `<div id="dmap"></div><table class="kv">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join("")}</table>
       ${evalHtml(r)}
       ${extraHtml(r)}
       <div class="acts"><button class="btn ${picked ? "on" : ""}" type="button" data-pick="${r.id}">${picked ? "✓ 비교에 담음" : "+ 비교 담기"}</button>
         ${["home", "daycare", "short"].includes(r.kind) ? `<button class="btn pri" type="button" id="toCalc">이 기관 비용 계산</button>` : ""}</div>
       <p class="note">빈자리는 정원에서 현원을 뺀 추정값이에요. 실제 입소 가능 여부와 비용은 기관에 전화로 확인하세요.</p>`);
     const tc = $("#toCalc"); if (tc) tc.onclick = () => toCalc(r);
+    detailMap(r);
   } catch (e) { show("오류", `<p>${esc(e.message)}</p>`); }
 }
 
@@ -610,6 +623,100 @@ function go(page) {
 }
 $("#nav").addEventListener("click", (e) => { const p = e.target.dataset?.p; if (p) go(p); });
 if (["#guide", "#calc"].includes(location.hash)) go(location.hash.slice(1));
+
+// ---------- 지도 (카카오맵, 화면에서 그때그때 주소→좌표. 좌표는 저장하지 않음) ----------
+let kakaoReady = null, mapView = false, bigMap = null, bigMarkers = [];
+const geoCache = new Map();   // 이 화면을 보는 동안만 기억 (저장 안 함)
+function loadKakao() {
+  if (kakaoReady) return kakaoReady;
+  kakaoReady = fetch("/api/config").then((r) => r.json()).then((c) => new Promise((ok, no) => {
+    if (!c.kakaoJsKey) return no(new Error("지도 키가 아직 설정되지 않았어요"));
+    const s = document.createElement("script");
+    s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(c.kakaoJsKey)}&autoload=false&libraries=services`;
+    s.onload = () => window.kakao.maps.load(() => ok(window.kakao));
+    s.onerror = () => no(new Error("지도를 불러오지 못했어요"));
+    document.head.appendChild(s);
+  }));
+  kakaoReady.catch(() => { kakaoReady = null; });
+  return kakaoReady;
+}
+const cleanAddr = (a) => String(a || "").replace(/\s*\([^)]*\)\s*$/, "").trim();
+function geocode(k, addr) {
+  const a = cleanAddr(addr);
+  if (!a) return Promise.resolve(null);
+  if (geoCache.has(a)) return Promise.resolve(geoCache.get(a));
+  return new Promise((ok) => new k.maps.services.Geocoder().addressSearch(a, (res, st) => {
+    const p = st === k.maps.services.Status.OK && res[0] ? { lat: Number(res[0].y), lng: Number(res[0].x) } : null;
+    geoCache.set(a, p); ok(p);
+  }));
+}
+// 기관 상세 안의 작은 지도
+async function detailMap(r) {
+  const box = $("#dmap"); if (!box || !r.addr) return;
+  try {
+    const k = await loadKakao(); const p = await geocode(k, r.addr);
+    if (!p || !$("#dmap")) { box.remove(); return; }
+    box.style.display = "block";
+    const pos = new k.maps.LatLng(p.lat, p.lng);
+    const m = new k.maps.Map(box, { center: pos, level: 4 });
+    new k.maps.Marker({ map: m, position: pos, title: r.name });
+  } catch { box.remove(); }
+}
+// 검색 결과 지도
+async function drawBigMap(rows) {
+  const box = $("#mapBox"); if (!mapView) return;
+  box.innerHTML = `<p class="muted" style="padding:16px">지도를 그리는 중…</p>`;
+  try {
+    const k = await loadKakao();
+    box.innerHTML = "";
+    bigMap = new k.maps.Map(box, { center: new k.maps.LatLng(37.5665, 126.978), level: 8 });
+    bigMarkers.forEach((m) => m.setMap(null)); bigMarkers = [];
+    const bounds = new k.maps.LatLngBounds(); let n = 0;
+    let open = null;
+    for (const r of rows) {
+      const p = await geocode(k, r.addr); if (!p) continue;
+      const pos = new k.maps.LatLng(p.lat, p.lng); bounds.extend(pos); n++;
+      const mk = new k.maps.Marker({ map: bigMap, position: pos, title: r.name }); bigMarkers.push(mk);
+      const ov = new k.maps.CustomOverlay({ position: pos, yAnchor: 1.6, content:
+        `<div class="mbub"><b>${esc(r.name)}</b>${r.eval_grade ? ` <span class="b g g${r.eval_grade}">기관평가 ${r.eval_grade}</span>` : ""}<br><span class="muted">${esc(r.kind_nm)}${r.capacity != null ? ` · 정원 ${r.capacity}` : ""}</span><br><button class="btn" type="button" data-detail="${r.id}">자세히</button></div>` });
+      k.maps.event.addListener(mk, "click", () => { if (open) open.setMap(null); ov.setMap(bigMap); open = ov; });
+    }
+    if (myPos) { const me = new k.maps.LatLng(myPos.lat, myPos.lng); bounds.extend(me);
+      new k.maps.CustomOverlay({ map: bigMap, position: me, content: `<div class="me">내 위치</div>` }); n++; }
+    if (n) bigMap.setBounds(bounds);
+    k.maps.event.addListener(bigMap, "click", () => { if (open) open.setMap(null); open = null; });
+    if (!rows.length) box.innerHTML = `<p class="muted" style="padding:16px">표시할 기관이 없어요.</p>`;
+  } catch (e) { box.innerHTML = `<p class="muted" style="padding:16px">${esc(e.message)}</p>`; }
+}
+function setView(map) {
+  mapView = map;
+  $("#vList").setAttribute("aria-pressed", !map); $("#vMap").setAttribute("aria-pressed", map);
+  $("#mapBox").hidden = !map;
+  if (map) drawBigMap(lastRows);
+}
+$("#vList").addEventListener("click", () => setView(false));
+$("#vMap").addEventListener("click", () => setView(true));
+// 내 주변 찾기: 내 위치 → 시·군·구 → 검색
+let myPos = null;
+$("#near").addEventListener("click", async () => {
+  if (!navigator.geolocation) { alertBox("이 브라우저에서는 위치를 확인할 수 없어요."); return; }
+  $("#near").disabled = true; $("#near").textContent = "위치 확인 중…";
+  const done = () => { $("#near").disabled = false; $("#near").textContent = "📍 내 주변 찾기"; };
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    try {
+      myPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      const k = await loadKakao();
+      const code = await new Promise((ok) => new k.maps.services.Geocoder().coord2RegionCode(myPos.lng, myPos.lat, (res, st) =>
+        ok(st === k.maps.services.Status.OK ? (res.find((x) => x.region_type === "B") || res[0])?.code : null)));
+      if (!code) throw new Error("위치로 지역을 찾지 못했어요");
+      const sido = code.slice(0, 2), sgg = code.slice(2, 5);
+      if (!regions.some((s) => s.cd === sido)) throw new Error("이 지역의 기관 정보가 아직 없어요");
+      $("#sido").value = sido; drawSgg();
+      if ([...$("#sgg").options].some((o) => o.value === sgg)) $("#sgg").value = sgg;
+      done(); setView(true); $("#form").requestSubmit();
+    } catch (e) { done(); alertBox(e.message); }
+  }, () => { done(); alertBox("위치 권한을 허용해 주세요. 브라우저 주소창 옆 자물쇠 아이콘에서 바꿀 수 있어요."); }, { enableHighAccuracy: false, timeout: 10000 });
+});
 
 // ---------- 시작 ----------
 (async function init() {
