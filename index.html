@@ -102,6 +102,19 @@ table.kv th{width:30%;color:var(--sub);font-weight:500;white-space:nowrap}
 .b.g{background:#eef0f3;color:#46505a}.b.gA{background:#2f6b4f;color:#fff}.b.gB{background:#d8eadf;color:#245a40}.b.gD{background:#f6e7d6;color:#8a5520}.b.gE{background:#f5dcd7;color:#a33b2b}
 h4.sec{margin:20px 0 6px;font-size:1rem;color:var(--main)}
 ul.pg{margin:0;padding-left:18px}ul.pg li{margin:3px 0}
+#chatBtn{position:fixed;right:16px;bottom:84px;z-index:20;border:0;border-radius:999px;background:var(--warm);color:#fff;font-weight:700;padding:12px 18px;box-shadow:0 6px 18px rgba(0,0,0,.18);cursor:pointer}
+#chat{position:fixed;right:16px;bottom:16px;z-index:30;width:min(400px,calc(100vw - 32px));height:min(620px,calc(100vh - 32px));background:#fff;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden}
+#chat[hidden]{display:none}
+.ch-h{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--main);color:#fff}.ch-h .x{color:#fff}
+.ch-b{flex:1;overflow-y:auto;padding:14px;background:var(--bg)}
+.msg{max-width:88%;padding:10px 12px;border-radius:14px;margin:0 0 10px;line-height:1.55;font-size:.95rem}
+.msg.bot{background:#fff;border:1px solid var(--line)}.msg.me{background:var(--main);color:#fff;margin-left:auto}
+.faq{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.faq .chip{font-size:.85rem;padding:6px 10px}
+.ch-ctx{padding:8px 14px;font-size:.85rem;background:var(--warm-soft);border-top:1px solid var(--line)}
+.lnk{border:0;background:none;color:var(--main);text-decoration:underline;cursor:pointer;font-size:.85rem}
+.ch-f{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+.ch-f textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit}
+.ch-n{margin:0;padding:0 12px 10px;font-size:.75rem}
 footer{background:#ebe6dc;color:var(--sub);font-size:.82rem;padding:24px 0 90px;margin-top:30px}
 footer p{margin:4px 0}
 @media (max-width:640px){
@@ -276,6 +289,21 @@ footer p{margin:4px 0}
   <span><b id="trayN">0</b>/5곳 담음 <button class="btn" type="button" id="trayClear" style="margin-left:6px">비우기</button></span>
   <button class="btn pri" type="button" id="trayGo">비교하기</button>
 </div></div>
+
+<button type="button" id="chatBtn" aria-label="AI 상담 열기">💬 AI 상담</button>
+<section id="chat" hidden aria-label="AI 상담">
+  <div class="ch-h"><b>케어온길 AI 상담</b><button class="x" type="button" id="chatX" aria-label="닫기">×</button></div>
+  <div class="ch-b" id="chatLog">
+    <div class="msg bot">안녕하세요. 장기요양 등급, 기관 고르기, 비용 같은 궁금한 점을 물어보세요.<br><span class="muted">아래 자주 묻는 질문은 횟수 제한 없이 바로 볼 수 있어요.</span></div>
+    <div class="faq" id="faq"></div>
+  </div>
+  <div class="ch-ctx" id="chatCtx" hidden></div>
+  <form class="ch-f" id="chatForm" autocomplete="off">
+    <textarea id="chatIn" rows="2" maxlength="500" placeholder="궁금한 점을 적어 주세요 (이름·주민번호는 적지 마세요)"></textarea>
+    <button type="submit" class="btn pri">보내기</button>
+  </form>
+  <p class="ch-n muted" id="chatNote">AI 답변은 참고용이에요. 등급 판정·의료 판단·입소 확정을 대신하지 않아요. 대화 내용은 저장하지 않아요. 하루 10번까지 무료.</p>
+</section>
 
 <dialog id="dlg"><div class="dlg-h"><h3 id="dlgT"></h3><button class="x" type="button" aria-label="닫기" onclick="dlg.close()">×</button></div><div class="dlg-b" id="dlgB"></div></dialog>
 
@@ -473,9 +501,11 @@ async function openDetail(id) {
       ${evalHtml(r)}
       ${extraHtml(r)}
       <div class="acts"><button class="btn ${picked ? "on" : ""}" type="button" data-pick="${r.id}">${picked ? "✓ 비교에 담음" : "+ 비교 담기"}</button>
-        ${["home", "daycare", "short"].includes(r.kind) ? `<button class="btn pri" type="button" id="toCalc">이 기관 비용 계산</button>` : ""}</div>
+        ${["home", "daycare", "short"].includes(r.kind) ? `<button class="btn pri" type="button" id="toCalc">이 기관 비용 계산</button>` : ""}
+        <button class="btn" type="button" id="askAi">💬 이 기관 AI에게 묻기</button></div>
       <p class="note">빈자리는 정원에서 현원을 뺀 추정값이에요. 실제 입소 가능 여부와 비용은 기관에 전화로 확인하세요.</p>`);
     const tc = $("#toCalc"); if (tc) tc.onclick = () => toCalc(r);
+    $("#askAi").onclick = () => openChat([r]);
     detailMap(r);
   } catch (e) { show("오류", `<p>${esc(e.message)}</p>`); }
 }
@@ -513,7 +543,9 @@ $("#trayGo").addEventListener("click", async () => {
       ${line("주차", (r) => esc(r.parking || "–"))}
       ${line("홈페이지", (r) => homeLink(r.homepage))}
       ${line("", (r) => `<button class="btn" type="button" data-unpick="${r.id}">빼기</button>`)}
-    </table></div><p class="note">공단에 신고된 값이에요. 비용·식단·프로그램·분위기는 꼭 방문 상담으로 확인하세요.</p>`, true);
+    </table></div><p class="note">공단에 신고된 값이에요. 비용·식단·프로그램·분위기는 꼭 방문 상담으로 확인하세요.</p>
+      <div class="acts"><button class="btn pri" type="button" id="askAiCmp">💬 이 기관들 AI에게 묻기</button></div>`, true);
+    $("#askAiCmp").onclick = () => openChat(rows);
   } catch (e) { show("오류", `<p>${esc(e.message)}</p>`); }
 });
 $("#dlgB").addEventListener("click", (e) => {
@@ -716,6 +748,52 @@ $("#near").addEventListener("click", async () => {
       done(); setView(true); $("#form").requestSubmit();
     } catch (e) { done(); alertBox(e.message); }
   }, () => { done(); alertBox("위치 권한을 허용해 주세요. 브라우저 주소창 옆 자물쇠 아이콘에서 바꿀 수 있어요."); }, { enableHighAccuracy: false, timeout: 10000 });
+});
+
+// ---------- AI 상담 (자주 묻는 질문은 AI 없이 바로 답) ----------
+const FAQ = [
+  ["등급 신청은 어떻게 하나요?", "만 65세 이상이거나, 65세 미만이라도 치매·뇌혈관질환 같은 노인성 질병이 있으면 신청할 수 있어요. 국민건강보험공단 지사 방문, 전화(1577-1000), 장기요양보험 누리집에서 신청하고 가족이 대신해도 돼요. 공단 직원의 방문조사와 의사소견서를 거쳐 원칙적으로 30일 안에 등급이 나와요. 자세한 순서는 위 '이용 안내 · 등급'을 보세요."],
+  ["요양원 비용은 한 달에 얼마예요?", "2026년 기준 요양원 하루 수가는 2등급 86,340원이에요. 일반(20% 부담)이면 30일 급여 본인부담이 약 51만 8천 원이고, 여기에 식재료비·상급침실료·이미용비 같은 비급여가 더해져요. 비급여는 기관마다 달라서 기관 상세의 '본인이 따로 내는 비용'을 보시고, '비용 계산기'로 직접 계산해 보세요."],
+  ["요양원과 주야간보호는 어떻게 달라요?", "요양원은 어르신이 들어가서 생활하는 시설(시설급여)이고, 원칙적으로 장기요양 1·2등급이 이용해요. 주야간보호는 낮 동안(또는 밤 동안) 센터에서 돌봄·식사·프로그램을 받고 저녁에 집으로 돌아오는 재가 서비스로, 1~5등급과 인지지원등급 모두 이용할 수 있어요. 재가는 월 한도 안에서 15%만 부담해요."],
+  ["본인부담을 줄일 수 있나요?", "건강보험료 순위와 재산 기준에 따라 본인부담이 40% 또는 60% 감경돼요(재가 9%·6%, 시설 12%·8%). 기초생활수급자(의료급여)는 본인부담이 없어요. 감경 여부는 공단이 장기요양인정서에 적어 보내요. 다만 식재료비 같은 비급여는 감경되지 않아요."],
+  ["좋은 요양원은 어떻게 골라요?", "① 가족이 자주 갈 수 있는 거리 ② 공단 기관평가 등급 ③ 정원 대비 현원과 대기 ④ 요양보호사·간호인력 수 ⑤ 식재료비 등 비급여 총액 ⑥ 침실 구성과 프로그램을 비교해 보세요. 그다음 2~3곳은 꼭 직접 가서 냄새, 분위기, 어르신 표정, 면회 방식을 확인하세요. 케어온길의 '비교 담기'로 최대 5곳을 나란히 볼 수 있어요."],
+];
+let chatHist = [], chatCtx = [], chatBusy = false;
+$("#faq").innerHTML = FAQ.map(([q], i) => `<button type="button" class="chip" data-faq="${i}">${esc(q)}</button>`).join("");
+const chatAdd = (who, html) => { const d = document.createElement("div"); d.className = "msg " + who; d.innerHTML = html; $("#chatLog").appendChild(d); $("#chatLog").scrollTop = 1e9; return d; };
+const fmt = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
+$("#faq").addEventListener("click", (e) => {
+  const i = e.target.dataset?.faq; if (i == null) return;
+  chatAdd("me", esc(FAQ[i][0])); chatAdd("bot", fmt(FAQ[i][1]));
+});
+function openChat(ctxRows) {
+  chatCtx = (ctxRows || []).map((r) => r.id);
+  $("#chatCtx").hidden = !chatCtx.length;
+  $("#chatCtx").innerHTML = chatCtx.length ? `보고 있는 기관: <b>${ctxRows.map((r) => esc(r.name)).join(", ")}</b> <button type="button" class="lnk" id="ctxX">빼기</button>` : "";
+  $("#chat").hidden = false; $("#chatBtn").hidden = true;
+  if (dlg.open) dlg.close();
+  setTimeout(() => $("#chatIn").focus(), 50);
+}
+$("#chatBtn").addEventListener("click", () => openChat([]));
+$("#chatX").addEventListener("click", () => { $("#chat").hidden = true; $("#chatBtn").hidden = false; });
+$("#chatCtx").addEventListener("click", (e) => { if (e.target.id === "ctxX") { chatCtx = []; $("#chatCtx").hidden = true; } });
+$("#chatIn").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#chatForm").requestSubmit(); } });
+$("#chatForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const q = $("#chatIn").value.trim(); if (!q || chatBusy) return;
+  chatBusy = true; $("#chatIn").value = "";
+  chatAdd("me", esc(q)); chatHist.push({ role: "user", content: q });
+  const wait = chatAdd("bot", `<span class="muted">답을 쓰는 중…</span>`);
+  try {
+    const r = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: chatHist.slice(-10), ctx: chatCtx }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { chatHist.pop(); wait.innerHTML = esc(j.오류 || "잠시 후 다시 시도해 주세요."); }
+    else {
+      wait.innerHTML = fmt(j.reply); chatHist.push({ role: "assistant", content: j.reply });
+      if (j.left != null) $("#chatNote").textContent = `AI 답변은 참고용이에요. 등급 판정·의료 판단·입소 확정을 대신하지 않아요. 대화 내용은 저장하지 않아요. 오늘 남은 횟수 ${j.left}번.`;
+    }
+  } catch { chatHist.pop(); wait.innerHTML = "연결이 끊겼어요. 다시 보내 주세요."; }
+  chatBusy = false; $("#chatLog").scrollTop = 1e9;
 });
 
 // ---------- 시작 ----------
