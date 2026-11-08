@@ -109,7 +109,9 @@ ul.pg{margin:0;padding-left:18px}ul.pg li{margin:3px 0}
 .ch-b{flex:1;overflow-y:auto;padding:14px;background:var(--bg)}
 .msg{max-width:88%;padding:10px 12px;border-radius:14px;margin:0 0 10px;line-height:1.55;font-size:.95rem}
 .msg.bot{background:#fff;border:1px solid var(--line)}.msg.me{background:var(--main);color:#fff;margin-left:auto}
-.faq{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.msg .faq{margin:8px 0 0}.more{display:block;margin-top:10px;font-size:.8rem}.faq .chip{font-size:.85rem;padding:6px 10px}
+.faq{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.msg .faq{margin:8px 0 0}.agree{display:flex;gap:8px;align-items:center;margin:8px 0;font-size:.95rem}.agree input{width:18px;height:18px;flex:none}
+.ailbl{display:inline-block;font-size:.72rem;font-weight:700;color:var(--warm);background:var(--warm-soft);border-radius:6px;padding:1px 6px;margin-bottom:4px}
+.more{display:block;margin-top:10px;font-size:.8rem}.faq .chip{font-size:.85rem;padding:6px 10px}
 .ch-ctx{padding:8px 14px;font-size:.85rem;background:var(--warm-soft);border-top:1px solid var(--line)}
 .lnk{border:0;background:none;color:var(--main);text-decoration:underline;cursor:pointer;font-size:.85rem}
 .ch-f{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
@@ -292,7 +294,7 @@ footer p{margin:4px 0}
 
 <button type="button" id="chatBtn" aria-label="AI 상담 열기">💬 AI 상담</button>
 <section id="chat" hidden aria-label="AI 상담">
-  <div class="ch-h"><b>케어온길 AI 상담</b><button class="x" type="button" id="chatX" aria-label="닫기">×</button></div>
+  <div class="ch-h"><b>케어온길 AI 상담 <small style="font-weight:400;opacity:.85">· 생성형 AI 기반</small></b><button class="x" type="button" id="chatX" aria-label="닫기">×</button></div>
   <div class="ch-b" id="chatLog">
     <div class="msg bot">안녕하세요. 장기요양 등급, 기관 고르기, 비용처럼 궁금하신 점을 편하게 물어봐 주세요.<br><span class="muted">아래 자주 묻는 질문은 횟수 제한 없이 바로 보실 수 있습니다.</span></div>
     <div class="faq" id="faq"></div>
@@ -302,13 +304,14 @@ footer p{margin:4px 0}
     <textarea id="chatIn" rows="2" maxlength="500" placeholder="궁금하신 점을 적어 주세요 (이름·주민번호는 적지 않으셔도 됩니다)"></textarea>
     <button type="submit" class="btn pri">보내기</button>
   </form>
-  <p class="ch-n muted" id="chatNote">AI 답변은 참고용이며 등급 판정·의료 판단·입소 확정을 대신하지 않습니다. 대화 내용은 저장하지 않습니다. 하루 10번까지 무료로 이용하실 수 있습니다.</p>
+  <p class="ch-n muted" id="chatNote">직접 쓰신 질문은 생성형 AI(Anthropic Claude)가 답하며, 질문은 답변 생성을 위해 미국 Anthropic으로 전송됩니다(<a href="/privacy.html" target="_blank">개인정보처리방침</a>). AI 답변은 참고용이며 등급 판정·의료 판단·입소 확정을 대신하지 않습니다. 대화 내용은 저장하지 않습니다. 하루 10번까지 무료로 이용하실 수 있습니다.</p>
 </section>
 
 <dialog id="dlg"><div class="dlg-h"><h3 id="dlgT"></h3><button class="x" type="button" aria-label="닫기" onclick="dlg.close()">×</button></div><div class="dlg-b" id="dlgB"></div></dialog>
 
 <footer><div class="wrap">
   <p>자료: 국민건강보험공단 장기요양기관 정보(공공데이터포털). 정원·현원·대기 인원은 공단에 신고된 값이라 실제와 다를 수 있으니 기관에 전화로 확인해 보시길 권해 드립니다.</p>
+  <p><a href="/privacy.html"><b>개인정보처리방침</b></a> · <a href="/terms.html">이용약관</a> · <a href="/location.html">위치기반서비스 이용약관</a> · <a href="#" id="locWithdraw">위치 이용 동의 철회</a></p>
   <p>케어온길은 기관 정보를 모아 보여 주는 서비스이며 장기요양등급 판정, 의료 판단, 입소 확정을 대신하지 않습니다.</p>
   <p style="margin-top:12px">주식회사 벤투런 · 대표 문창조 · 사업자등록번호 588-86-02083 · 통신판매업 제2026-고양일산동-1926호<br>
   경기도 고양시 일산동구 위시티4로 80, 111동 17층 1702호 · 031-818-6336 · moongoldenj@naver.com</p>
@@ -730,7 +733,28 @@ $("#vList").addEventListener("click", () => setView(false));
 $("#vMap").addEventListener("click", () => setView(true));
 // 내 주변 찾기: 내 위치 → 시·군·구 → 검색
 let myPos = null;
-$("#near").addEventListener("click", async () => {
+// 위치기반서비스 동의 (위치정보법 제15·18조). 동의 기록은 이 브라우저와 서버(좌표 없이)에 남김
+const LOC_KEY = "cog_loc_consent_v1";
+const locOk = () => { try { return !!localStorage.getItem(LOC_KEY); } catch { return false; } };
+const locLog = (type) => fetch("/api/loclog", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type }) }).catch(() => {});
+function askLoc(go) {
+  show("내 주변 찾기 · 위치 이용 동의", `
+    <p>현재 위치로 시·군·구를 확인해 가까운 기관을 보여 드립니다.</p>
+    <ul class="pg">
+      <li>위치(좌표)는 이용자 브라우저에서 카카오 지도 서비스로만 보내 지역 확인에 쓰고, <b>케어온길 서버로 보내거나 저장하지 않습니다.</b></li>
+      <li>위치정보법에 따라 동의·이용 사실(일시, 목적)만 좌표 없이 기록하고 1년 뒤 삭제합니다.</li>
+      <li>언제든 화면 맨 아래 '위치 이용 동의 철회'로 철회하실 수 있습니다.</li>
+    </ul>
+    <label class="agree"><input type="checkbox" id="locA1"><span><a href="/location.html" target="_blank">위치기반서비스 이용약관</a>에 동의합니다 (필수)</span></label>
+    <label class="agree"><input type="checkbox" id="locA2"><span>만 14세 이상입니다 (필수)</span></label>
+    <div class="acts"><button class="btn pri" type="button" id="locGo" disabled>동의하고 찾기</button><button class="btn" type="button" onclick="dlg.close()">동의하지 않음</button></div>
+    <p class="muted">동의하지 않으셔도 시·도와 시·군·구를 직접 골라 찾으실 수 있습니다.</p>`);
+  const sync = () => { $("#locGo").disabled = !($("#locA1").checked && $("#locA2").checked); };
+  $("#locA1").onchange = sync; $("#locA2").onchange = sync;
+  $("#locGo").onclick = () => { try { localStorage.setItem(LOC_KEY, new Date().toISOString()); } catch {} locLog("consent"); dlg.close(); go(); };
+}
+$("#near").addEventListener("click", () => { if (locOk()) runNear(); else askLoc(runNear); });
+async function runNear() {
   if (!navigator.geolocation) { alertBox("이 브라우저에서는 위치를 확인할 수 없습니다."); return; }
   $("#near").disabled = true; $("#near").textContent = "위치 확인 중입니다…";
   const done = () => { $("#near").disabled = false; $("#near").textContent = "📍 내 주변 찾기"; };
@@ -746,8 +770,15 @@ $("#near").addEventListener("click", async () => {
       $("#sido").value = sido; drawSgg();
       if ([...$("#sgg").options].some((o) => o.value === sgg)) $("#sgg").value = sgg;
       done(); setView(true); $("#form").requestSubmit();
+      locLog("use");
     } catch (e) { done(); alertBox(e.message); }
   }, () => { done(); alertBox("위치 권한을 허용해 주시면 내 주변을 찾아 드립니다. 브라우저 주소창 옆 자물쇠 아이콘에서 바꾸실 수 있습니다."); }, { enableHighAccuracy: false, timeout: 10000 });
+}
+$("#locWithdraw").addEventListener("click", (e) => {
+  e.preventDefault();
+  try { localStorage.removeItem(LOC_KEY); } catch {}
+  myPos = null; locLog("withdraw");
+  alertBox("위치 이용 동의를 철회했습니다. 동의 기록도 파기했습니다. 브라우저에서 위치 권한까지 끄시려면 주소창 옆 자물쇠 아이콘에서 바꾸실 수 있습니다.");
 });
 
 // ---------- AI 상담 (자주 묻는 질문은 AI 없이 바로 답) ----------
@@ -808,8 +839,8 @@ $("#chatForm").addEventListener("submit", async (e) => {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { chatHist.pop(); wait.innerHTML = esc(j.오류 || "잠시 후 다시 시도해 주시기 바랍니다."); }
     else {
-      wait.innerHTML = fmt(j.reply); chatHist.push({ role: "assistant", content: j.reply });
-      if (j.left != null) $("#chatNote").textContent = `AI 답변은 참고용이며 등급 판정·의료 판단·입소 확정을 대신하지 않습니다. 대화 내용은 저장하지 않습니다. 오늘 남은 횟수는 ${j.left}번입니다.`;
+      wait.innerHTML = `<span class="ailbl">AI 답변</span>` + fmt(j.reply); chatHist.push({ role: "assistant", content: j.reply });
+      if (j.left != null) $("#chatNote").textContent = `직접 쓰신 질문은 생성형 AI(Anthropic Claude)가 답합니다. AI 답변은 참고용이며 등급 판정·의료 판단·입소 확정을 대신하지 않습니다. 오늘 남은 횟수는 ${j.left}번입니다.`;
     }
   } catch { chatHist.pop(); wait.innerHTML = "연결이 끊겼습니다. 다시 보내 주시기 바랍니다."; }
   chatBusy = false; $("#chatLog").scrollTop = 1e9;
