@@ -123,7 +123,7 @@ footer p{margin:4px 0}
           <option value="capacity">정원 많은 순</option>
           <option value="new">최근 지정 순</option>
           <option value="old">오래된 기관 순</option>
-          <option value="grade">평가 등급 순</option>
+          <option value="grade">기관평가 좋은 순</option>
         </select></div>
     </div>
     <div class="chips" id="kinds" role="group" aria-label="기관 종류"></div>
@@ -148,7 +148,18 @@ footer p{margin:4px 0}
     </ol>
   </div>
   <div class="panel">
-    <h2>장기요양 등급 한눈에 보기</h2>
+    <h2>'등급'이 두 가지예요</h2>
+    <div class="cmp"><table class="tbl">
+      <tr><th></th><th>장기요양등급</th><th>기관평가 등급</th></tr>
+      <tr><td><b>무엇을</b></td><td>어르신의 몸 상태</td><td>기관의 서비스 수준</td></tr>
+      <tr><td><b>표시</b></td><td>1~5등급, 인지지원등급</td><td>A(최우수) · B(우수) · C(양호) · D(보통) · E(미흡)</td></tr>
+      <tr><td><b>누가</b></td><td>국민건강보험공단 등급판정위원회</td><td>국민건강보험공단 (기관 평가)</td></tr>
+      <tr><td><b>쓰임</b></td><td>쓸 수 있는 서비스와 한도액, 비용 계산</td><td>기관을 고를 때 참고</td></tr>
+    </table></div>
+    <p class="muted">비용 계산기의 '1등급·2등급'은 어르신의 장기요양등급이고, 기관 목록의 'A·B·C'는 기관평가예요.</p>
+  </div>
+  <div class="panel">
+    <h2>어르신 장기요양등급 한눈에 보기</h2>
     <div class="cmp"><table class="tbl">
       <tr><th>등급</th><th>인정 점수</th><th>상태</th><th>쓸 수 있는 서비스</th></tr>
       <tr><td><b>1등급</b></td><td>95점 이상</td><td>일상생활 전부 도움 필요</td><td>요양원 · 재가 모두</td></tr>
@@ -172,6 +183,36 @@ footer p{margin:4px 0}
     </table></div>
     <p class="muted">감경 여부는 공단이 건강보험료 순위·재산 등으로 정해 장기요양인정서에 적어 보내요. 식재료비·상급침실료·이미용비 같은 <b>비급여는 감경 없이 전액 본인부담</b>이에요.</p>
   </div>
+  <div class="panel" id="guide-eval">
+    <h2>기관평가(A~E)는 어떻게 나오나요?</h2>
+    <p>국민건강보험공단이 노인장기요양보험법 제54조에 따라 장기요양기관의 서비스 수준을 평가해 공개하는 제도예요. 케어온길은 공단이 공공데이터포털에 공개한 평가 결과를 그대로 보여 줍니다.</p>
+    <h3>어떻게 평가하나요</h3>
+    <ul class="pg">
+      <li><b>정기평가</b>: 기관마다 <b>3년에 한 번</b>, 서비스 종류별로(요양원, 주야간보호, 방문요양 등) 따로 받아요. 같은 기관이라도 종류마다 등급이 다를 수 있어요.</li>
+      <li><b>수시평가</b>: 정기평가에서 E등급을 받았거나 휴업 등으로 평가를 못 받은 기관은 다음 해에 다시 평가받아요. 케어온길은 정기·수시 중 <b>가장 최근 결과</b>를 보여 줘요.</li>
+      <li>평가자가 기관을 직접 방문해 서류와 현장을 확인하고, 이용 어르신과 직원을 면담·관찰해요.</li>
+      <li>평가 영역: 2025년부터 기관운영 · 수급자존중 · 서비스제공 · 서비스결과 (그 전에는 기관운영 · 환경및안전 · 수급자권리보장 · 급여제공과정 · 급여제공결과)</li>
+    </ul>
+    <h3>등급 기준 (절대평가)</h3>
+    <div class="cmp"><table class="tbl">
+      <tr><th>등급</th><th>기준</th></tr>
+      <tr><td><b>A</b> 최우수</td><td>총점 90점 이상, 영역별 모두 70점 이상</td></tr>
+      <tr><td><b>B</b> 우수</td><td>총점 80점 이상, 영역별 모두 60점 이상</td></tr>
+      <tr><td><b>C</b> 양호</td><td>총점 70점 이상, 영역별 모두 50점 이상</td></tr>
+      <tr><td><b>D</b> 보통</td><td>총점 60점 이상, 영역별 모두 40점 이상</td></tr>
+      <tr><td><b>E</b> 미흡</td><td>D 기준에 못 미침</td></tr>
+    </table></div>
+    <p class="muted">행정처분을 받은 기관은 한 단계 낮추고, 노인학대로 처분받으면 최하위로 조정해요. 총점이 높아도 한 영역이 낮으면 등급이 내려갈 수 있어요.</p>
+    <h3>등급이 없는 기관은 왜 없나요?</h3>
+    <ul class="pg">
+      <li><b>신설 기관</b>: 지정된 지 얼마 안 돼 아직 평가 대상이 아니에요.</li>
+      <li><b>평가 비대상</b>: 평가 기간에 이용 어르신이 너무 적었던 기관(예: 평균 3명 미만)은 평가하지 않아요.</li>
+      <li><b>휴업 · 업무정지 · 평가 거부</b> 등으로 평가를 받지 못한 기관</li>
+      <li><b>다음 평가 차례를 기다리는 중</b>: 케어온길에는 2021~2025년 결과가 들어 있어요. 기관기호가 바뀐 경우(재지정 등)에도 예전 결과가 연결되지 않을 수 있어요.</li>
+    </ul>
+    <p class="muted">등급이 없다고 나쁜 기관이라는 뜻은 아니에요. 등급은 고를 때 참고만 하시고, 꼭 직접 방문해 보세요.</p>
+    <p class="muted">자료: 국민건강보험공단 장기요양기관 평가 결과(2026.6.25 기준), 수시평가 결과(2026.9.17 기준), 공공데이터포털. 평가 기준: 공단 장기요양기관 평가 매뉴얼.</p>
+  </div>
 </section>
 
 <section class="wrap page" id="calc" hidden>
@@ -183,7 +224,7 @@ footer p{margin:4px 0}
       <button type="button" class="chip" data-m="home" aria-pressed="false">집에서 재가 서비스</button>
     </div>
     <div class="row three">
-      <div><label class="f" for="cGrade">등급</label><select id="cGrade"></select></div>
+      <div><label class="f" for="cGrade">어르신 장기요양등급</label><select id="cGrade"></select></div>
       <div><label class="f" for="cRate">본인부담 유형</label>
         <select id="cRate"><option value="0">일반</option><option value="40">40% 감경</option><option value="60">60% 감경</option><option value="100">기초생활수급자(면제)</option></select></div>
       <div id="cStayType"><label class="f" for="cFac">시설 종류</label>
@@ -289,7 +330,7 @@ function toUrl() {
 }
 
 // ---------- 목록 ----------
-const gradeBadge = (r) => (r.eval_grade ? `<span class="b g g${r.eval_grade}" title="국민건강보험공단 ${r.eval_year}년 평가">평가 ${r.eval_grade}등급 <small>(${r.eval_year})</small></span>` : "");
+const gradeBadge = (r) => (r.eval_grade ? `<span class="b g g${r.eval_grade}" title="국민건강보험공단 ${r.eval_year}년 기관 평가">기관평가 ${r.eval_grade} <small>(${r.eval_year})</small></span>` : "");
 const GRADE_NM = { A: "최우수", B: "우수", C: "양호", D: "보통", E: "미흡" };
 const regionName = (r) => {
   const s = regions.find((x) => x.cd === r.sido_cd);
@@ -362,15 +403,21 @@ const won = (v) => (v == null ? "–" : Number(v).toLocaleString("ko-KR") + "원
 const nz = (o) => Object.entries(o || {}).filter(([, v]) => v);
 function evalHtml(r) {
   const ev = Array.isArray(r.evals) ? r.evals : [];
-  if (!ev.length) return `<h4 class="sec">공단 평가</h4><p class="muted">평가 결과가 없어요. 지정된 지 3년이 안 된 기관이거나 평가 대상이 아니었을 수 있어요.</p>`;
+  const more = `<a href="#guide-eval" onclick="dlg.close();go('guide');setTimeout(()=>document.getElementById('guide-eval').scrollIntoView(),50);return false;">기관평가란? · 등급이 없는 이유</a>`;
+  if (!ev.length) {
+    const y = Number(String(r.designated || "").slice(0, 4));
+    const why = y && y >= 2023 ? `${y}년에 지정된 기관이라 아직 평가를 받지 않았을 가능성이 커요(평가는 지정 후 일정 기간이 지난 기관부터 받아요).`
+      : "평가 기간에 이용자가 너무 적었거나(평가 비대상), 휴업 등으로 평가를 받지 못했거나, 다음 평가를 기다리는 중일 수 있어요.";
+    return `<h4 class="sec">기관평가 (국민건강보험공단)</h4><p>평가 결과가 없어요. ${why}</p><p class="muted">${more}</p>`;
+  }
   const now = ev[0];
   const areas = Object.entries(now.areas || {}).map(([k, v]) => `${esc(k)} <b>${v}</b>`).join(" · ");
-  return `<h4 class="sec">공단 평가</h4>
-    <p><span class="b g g${now.grade}" style="font-size:.95rem">${now.grade}등급 · ${GRADE_NM[now.grade] || ""}</span>
+  return `<h4 class="sec">기관평가 (국민건강보험공단)</h4>
+    <p><span class="b g g${now.grade}" style="font-size:.95rem">${now.grade} · ${GRADE_NM[now.grade] || ""}</span>
       <span class="muted">${esc(now.round)} · ${now.score}점 · ${esc(now.eval_date)}</span></p>
-    ${areas ? `<p class="muted">영역별 점수: ${areas}</p>` : ""}
+    ${areas ? `<p class="muted">영역별 점수(100점 만점): ${areas}</p>` : ""}
     ${ev.length > 1 ? `<p class="muted">지난 평가: ${ev.slice(1).map((x) => `${esc(x.round)} <b>${x.grade}</b>`).join(" · ")}</p>` : ""}
-    <p class="muted">국민건강보험공단이 3년마다 하는 평가예요. A 최우수 · B 우수 · C 양호 · D 보통 · E 미흡.</p>`;
+    <p class="muted">기관의 서비스 수준을 공단이 3년마다 평가한 결과예요(A 최우수 ~ E 미흡). 어르신의 '장기요양 1~5등급'과는 다른 것이에요. ${more}</p>`;
 }
 function extraHtml(r) {
   if (!STAY.has(r.kind)) return "";
@@ -435,7 +482,7 @@ $("#trayGo").addEventListener("click", async () => {
     show(`${rows.length}곳 비교`, `<div class="cmp"><table>
       ${line("이름", (r) => `<b>${esc(r.name)}</b>`)}
       ${line("종류", (r) => esc(r.kind_nm + (r.sub_nm ? ` (${r.sub_nm})` : "")))}
-      ${line("공단 평가", (r) => (r.eval_grade ? `<b>${r.eval_grade}등급</b> <span class="muted">(${r.eval_year})</span>` : "–"))}
+      ${line("기관평가", (r) => (r.eval_grade ? `<b>${r.eval_grade}</b> ${GRADE_NM[r.eval_grade]} <span class="muted">(${r.eval_year})</span>` : `<span class="muted">결과 없음</span>`))}
       ${line("치매전담실", (r) => (r.dementia_units ? `${r.dementia_units}실` : "–"))}
       ${line("주소", (r) => esc(r.addr || "준비 중"))}
       ${line("전화", (r) => (r.tel ? `<a href="tel:${esc(r.tel)}">${esc(r.tel)}</a>` : "–"))}
