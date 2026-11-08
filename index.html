@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>케어온길 — 요양원·주야간보호·방문요양 찾기와 비교</title>
+<meta name="description" content="전국 장기요양기관(요양원·주야간보호·단기보호·방문요양·방문목욕·방문간호)을 지역별로 찾고 정원·현원·대기를 한눈에 비교하세요.">
+<meta property="og:title" content="케어온길 — 부모님 돌봄, 가까운 요양기관 찾기">
+<meta property="og:description" content="전국 장기요양기관을 지역별로 찾고 최대 5곳까지 비교하세요.">
+<meta property="og:type" content="website">
+<style>
+:root{
+  --bg:#f7f4ee; --card:#fff; --ink:#1f2a24; --sub:#5d6a62; --line:#e4ded2;
+  --main:#2f6b4f; --main-soft:#e6f0ea; --warm:#c8762f; --warm-soft:#fbefe2; --bad:#a33b2b;
+  --r:14px;
+}
+*{box-sizing:border-box}
+html{font-size:17px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;line-height:1.55;word-break:keep-all}
+a{color:var(--main)}
+button,select,input{font:inherit;color:inherit}
+.wrap{max-width:960px;margin:0 auto;padding:0 16px}
+header{background:var(--main);color:#fff;padding:22px 0 64px}
+.logo{font-size:1.5rem;font-weight:800;letter-spacing:-.02em;margin:0}
+.logo span{color:#f3c99a}
+.tag{margin:6px 0 0;opacity:.9}
+.search{background:var(--card);border-radius:var(--r);box-shadow:0 6px 24px rgba(31,42,36,.08);padding:18px;margin-top:-46px}
+.row{display:grid;gap:10px;grid-template-columns:1fr 1fr}
+.row.three{grid-template-columns:1fr 1fr 1fr}
+label.f{display:block;font-size:.85rem;color:var(--sub);margin-bottom:4px}
+select,input[type=search]{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 14px;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--main);border-color:var(--main);color:#fff}
+.go{width:100%;margin-top:12px;padding:13px;border:0;border-radius:10px;background:var(--main);color:#fff;font-weight:700;font-size:1.05rem;cursor:pointer}
+.go:hover{filter:brightness(1.08)}
+.meta{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:22px 0 10px;flex-wrap:wrap}
+.meta h2{font-size:1.1rem;margin:0}
+.list{display:grid;gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.card h3{margin:0 0 4px;font-size:1.1rem}
+.badges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.b{font-size:.78rem;padding:2px 8px;border-radius:6px;background:var(--main-soft);color:var(--main);font-weight:600}
+.b.w{background:var(--warm-soft);color:var(--warm)}
+.addr{color:var(--sub);font-size:.92rem;margin:2px 0}
+.nums{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:12px 0 4px;text-align:center}
+.nums div{background:var(--bg);border-radius:10px;padding:8px 4px}
+.nums b{display:block;font-size:1.15rem}
+.nums small{color:var(--sub);font-size:.78rem}
+.nums .vac b{color:var(--main)}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 12px;cursor:pointer;text-decoration:none;color:var(--ink);font-size:.92rem}
+.btn.on{background:var(--warm);border-color:var(--warm);color:#fff}
+.btn.pri{background:var(--main);border-color:var(--main);color:#fff}
+.muted{color:var(--sub);font-size:.88rem}
+.pager{display:flex;justify-content:center;gap:10px;align-items:center;margin:18px 0 120px}
+.empty{background:var(--card);border:1px dashed var(--line);border-radius:var(--r);padding:28px;text-align:center;color:var(--sub)}
+.tray{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(0,0,0,.06);padding:10px 0;transform:translateY(110%);transition:transform .2s}
+.tray.show{transform:none}
+.tray .wrap{display:flex;align-items:center;gap:10px;justify-content:space-between}
+dialog{border:0;border-radius:var(--r);padding:0;width:min(720px,94vw);max-height:90vh}
+dialog::backdrop{background:rgba(20,28,24,.5)}
+.dlg-h{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff}
+.dlg-h h3{margin:0;font-size:1.1rem}
+.dlg-b{padding:16px 18px}
+.x{border:0;background:none;font-size:1.6rem;cursor:pointer;line-height:1}
+table.kv{width:100%;border-collapse:collapse}
+table.kv th,table.kv td{text-align:left;padding:9px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+table.kv th{width:30%;color:var(--sub);font-weight:500;white-space:nowrap}
+.cmp{overflow-x:auto}
+.cmp table{border-collapse:collapse;min-width:100%}
+.cmp th,.cmp td{border-bottom:1px solid var(--line);padding:9px 8px;text-align:left;vertical-align:top;min-width:150px}
+.cmp th:first-child{position:sticky;left:0;background:#fff;min-width:80px;color:var(--sub);font-weight:500}
+.note{background:var(--warm-soft);border-radius:10px;padding:10px 12px;font-size:.88rem;margin-top:14px}
+footer{background:#ebe6dc;color:var(--sub);font-size:.82rem;padding:24px 0 90px;margin-top:30px}
+footer p{margin:4px 0}
+@media (max-width:640px){
+  .row,.row.three{grid-template-columns:1fr 1fr}
+  .row.three>div:last-child{grid-column:1/-1}
+  .nums{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <p class="logo">케어<span>온</span>길</p>
+    <p class="tag">부모님 돌봄, 가까운 장기요양기관을 찾고 비교하세요</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <form class="search" id="form" autocomplete="off">
+    <div class="row three">
+      <div><label class="f" for="sido">시·도</label><select id="sido"><option value="">불러오는 중…</option></select></div>
+      <div><label class="f" for="sgg">시·군·구</label><select id="sgg"><option value="">전체</option></select></div>
+      <div><label class="f" for="sort">정렬</label>
+        <select id="sort">
+          <option value="name">이름순</option>
+          <option value="capacity">정원 많은 순</option>
+          <option value="new">최근 지정 순</option>
+          <option value="old">오래된 기관 순</option>
+        </select></div>
+    </div>
+    <div class="chips" id="kinds" role="group" aria-label="기관 종류"></div>
+    <label class="f" for="q">기관 이름 (선택)</label>
+    <input type="search" id="q" placeholder="예: 행복요양원" maxlength="30">
+    <button class="go" type="submit">찾기</button>
+  </form>
+
+  <div class="meta"><h2 id="count">지역을 고르고 찾기를 눌러 주세요</h2><span class="muted" id="hint"></span></div>
+  <div class="list" id="list"></div>
+  <div class="pager" id="pager"></div>
+</main>
+
+<div class="tray" id="tray"><div class="wrap">
+  <span><b id="trayN">0</b>/5곳 담음 <button class="btn" type="button" id="trayClear" style="margin-left:6px">비우기</button></span>
+  <button class="btn pri" type="button" id="trayGo">비교하기</button>
+</div></div>
+
+<dialog id="dlg"><div class="dlg-h"><h3 id="dlgT"></h3><button class="x" type="button" aria-label="닫기" onclick="dlg.close()">×</button></div><div class="dlg-b" id="dlgB"></div></dialog>
+
+<footer><div class="wrap">
+  <p>자료: 국민건강보험공단 장기요양기관 정보(공공데이터포털). 정원·현원·대기 인원은 공단에 신고된 값이라 실제와 다를 수 있으니 기관에 꼭 전화로 확인하세요.</p>
+  <p>케어온길은 기관 정보를 모아 보여 주는 서비스이며 장기요양등급 판정, 의료 판단, 입소 확정을 대신하지 않습니다.</p>
+  <p style="margin-top:12px">주식회사 벤투런 · 대표 문창조 · 사업자등록번호 588-86-02083 · 통신판매업 제2026-고양일산동-1926호<br>
+  경기도 고양시 일산동구 위시티4로 80, 111동 17층 1702호 · 031-818-6336 · moongoldenj@naver.com</p>
+</div></footer>
+
+<script>
+const KINDS = [["home","요양원"],["daycare","주야간보호"],["short","단기보호"],["visit_care","방문요양"],["visit_bath","방문목욕"],["visit_nurse","방문간호"]];
+const STAY = new Set(["home","daycare","short"]);  // 정원·현원이 있는 종류
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num = (v) => (v == null ? "–" : Number(v).toLocaleString("ko-KR"));
+const day = (s) => (s ? String(s).slice(0, 10) : "–");
+let regions = [], state = { sido: "", sgg: "", kinds: ["home"], q: "", sort: "name", page: 1 }, lastRows = [];
+
+// 비교 담기 (이 브라우저에만 저장)
+let picks = [];
+try { picks = JSON.parse(localStorage.getItem("cog_picks") || "[]").slice(0, 5); } catch { picks = []; }
+const savePicks = () => { try { localStorage.setItem("cog_picks", JSON.stringify(picks)); } catch {} ; drawTray(); };
+
+async function api(params) {
+  const r = await fetch("/api/search?" + new URLSearchParams(params));
+  const j = await r.json().catch(() => ({ 오류: "응답을 읽지 못했어요" }));
+  if (!r.ok) throw new Error(j.오류 || "잠시 후 다시 시도해 주세요");
+  return j;
+}
+
+// ---------- 검색 폼 ----------
+function drawKinds() {
+  $("#kinds").innerHTML = KINDS.map(([k, n]) => `<button type="button" class="chip" data-k="${k}" aria-pressed="${state.kinds.includes(k)}">${n}</button>`).join("");
+}
+$("#kinds").addEventListener("click", (e) => {
+  const k = e.target.dataset?.k; if (!k) return;
+  state.kinds = state.kinds.includes(k) ? state.kinds.filter((x) => x !== k) : [...state.kinds, k];
+  drawKinds();
+});
+function drawSgg() {
+  const s = regions.find((r) => r.cd === $("#sido").value);
+  const list = (s?.sggs || []).slice().sort((a, b) => a.nm.localeCompare(b.nm, "ko"));
+  $("#sgg").innerHTML = `<option value="">전체</option>` + list.map((g) => `<option value="${g.cd}">${esc(g.nm)}</option>`).join("");
+  $("#sgg").disabled = !list.length;
+}
+$("#sido").addEventListener("change", drawSgg);
+$("#form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  state = { sido: $("#sido").value, sgg: $("#sgg").value, kinds: state.kinds, q: $("#q").value.trim(), sort: $("#sort").value, page: 1 };
+  search(true);
+});
+
+function toUrl() {
+  const p = new URLSearchParams();
+  if (state.sido) p.set("sido", state.sido);
+  if (state.sgg) p.set("sgg", state.sgg);
+  if (state.kinds.length) p.set("kind", state.kinds.join(","));
+  if (state.q) p.set("q", state.q);
+  if (state.sort !== "name") p.set("sort", state.sort);
+  if (state.page > 1) p.set("page", state.page);
+  history.replaceState(null, "", p.toString() ? "?" + p : location.pathname);
+}
+
+// ---------- 목록 ----------
+const regionName = (r) => {
+  const s = regions.find((x) => x.cd === r.sido_cd);
+  return s?.sggs.find((g) => g.cd === r.sgg_cd)?.nm || s?.nm || "";
+};
+function card(r) {
+  const picked = picks.includes(r.id);
+  const nums = STAY.has(r.kind) && r.has_detail ? `<div class="nums">
+      <div><b>${num(r.capacity)}</b><small>정원</small></div>
+      <div><b>${num(r.now)}</b><small>현원</small></div>
+      <div class="vac"><b>${num(r.vacancy)}</b><small>빈자리(추정)</small></div>
+      <div><b>${num(r.wait)}</b><small>대기</small></div></div>` : "";
+  return `<article class="card">
+    <div class="badges"><span class="b">${esc(r.kind_nm)}</span>${r.sub_nm ? `<span class="b w">${esc(r.sub_nm)}</span>` : ""}</div>
+    <h3>${esc(r.name)}</h3>
+    <p class="addr">${r.addr ? esc(r.addr) : esc(regionName(r)) + ' <span class="muted">· 상세 정보 준비 중</span>'}</p>
+    ${nums}
+    <p class="muted">장기요양기관 지정일 ${day(r.designated)}</p>
+    <div class="acts">
+      ${r.tel ? `<a class="btn" href="tel:${esc(r.tel)}">📞 ${esc(r.tel)}</a>` : ""}
+      <button class="btn" type="button" data-detail="${r.id}">자세히</button>
+      <button class="btn ${picked ? "on" : ""}" type="button" data-pick="${r.id}">${picked ? "✓ 비교에 담음" : "+ 비교 담기"}</button>
+    </div></article>`;
+}
+async function search(scroll) {
+  toUrl();
+  if (!state.sido && state.q.length < 2) { $("#count").textContent = "시·도를 고르거나 기관 이름을 2글자 이상 넣어 주세요"; return; }
+  $("#count").textContent = "찾는 중…"; $("#list").innerHTML = ""; $("#pager").innerHTML = "";
+  try {
+    const p = { sort: state.sort, page: state.page };
+    if (state.sido) p.sido = state.sido;
+    if (state.sgg) p.sgg = state.sgg;
+    if (state.kinds.length) p.kind = state.kinds.join(",");
+    if (state.q) p.q = state.q;
+    const j = await api(p);
+    lastRows = j.rows;
+    $("#count").textContent = `${num(j.total)}곳`;
+    $("#hint").textContent = j.total ? `${j.page} / ${j.pages}쪽` : "";
+    $("#list").innerHTML = j.rows.length ? j.rows.map(card).join("") : `<div class="empty">조건에 맞는 기관이 없어요. 종류나 지역을 넓혀 보세요.</div>`;
+    if (j.pages > 1) $("#pager").innerHTML =
+      `<button class="btn" type="button" data-page="${j.page - 1}" ${j.page <= 1 ? "disabled" : ""}>‹ 이전</button>
+       <span class="muted">${j.page} / ${j.pages}</span>
+       <button class="btn" type="button" data-page="${j.page + 1}" ${j.page >= j.pages ? "disabled" : ""}>다음 ›</button>`;
+    if (scroll) $(".meta").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) {
+    $("#count").textContent = "불러오지 못했어요";
+    $("#list").innerHTML = `<div class="empty">${esc(e.message)}</div>`;
+  }
+}
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("[data-detail],[data-pick],[data-page]"); if (!t) return;
+  if (t.dataset.page) { state.page = Number(t.dataset.page); search(true); }
+  if (t.dataset.detail) openDetail(t.dataset.detail);
+  if (t.dataset.pick) {
+    const id = t.dataset.pick;
+    if (picks.includes(id)) picks = picks.filter((x) => x !== id);
+    else if (picks.length >= 5) { alertBox("비교는 최대 5곳까지 담을 수 있어요."); return; }
+    else picks.push(id);
+    savePicks();
+    document.querySelectorAll(`[data-pick="${id}"]`).forEach((b) => { const on = picks.includes(id); b.classList.toggle("on", on); b.textContent = on ? "✓ 비교에 담음" : "+ 비교 담기"; });
+  }
+});
+
+// ---------- 상세 ----------
+function show(title, html) { $("#dlgT").textContent = title; $("#dlgB").innerHTML = html; dlg.showModal(); }
+function alertBox(msg) { show("알림", `<p>${esc(msg)}</p>`); }
+const mapLink = (r) => (r.addr ? `https://map.kakao.com/link/search/${encodeURIComponent(r.addr)}` : null);
+const homeLink = (u) => (/^https?:\/\//.test(u || "") ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(u)}</a>` : "–");
+async function openDetail(id) {
+  show("불러오는 중…", "");
+  try {
+    const r = await api({ id });
+    const rows = [
+      ["종류", r.kind_nm + (r.sub_nm ? ` (${r.sub_nm})` : "")],
+      ["주소", r.addr ? esc(r.addr + (r.addr_detail ? " " + r.addr_detail : "")) + (mapLink(r) ? ` <a href="${mapLink(r)}" target="_blank" rel="noopener">지도</a>` : "") : "상세 정보 준비 중"],
+      ["전화", r.tel ? `<a href="tel:${esc(r.tel)}">${esc(r.tel)}</a>` : "–"],
+      ...(STAY.has(r.kind) ? [
+        ["정원", num(r.capacity)],
+        ["현원", `${num(r.now)} <span class="muted">(남 ${num(r.now_m)} · 여 ${num(r.now_f)})</span>`],
+        ["빈자리(추정)", num(r.vacancy)],
+        ["대기", `${num(r.wait)} <span class="muted">(남 ${num(r.wait_m)} · 여 ${num(r.wait_f)})</span>`],
+      ] : []),
+      ["지정일", day(r.designated)],
+      ["홈페이지", homeLink(r.homepage)],
+      ["주차", esc(r.parking || "–")],
+      ["교통", esc(r.transport || "–")],
+      ["자료 기준", r.detail_at ? day(r.detail_at) + " 공단 자료" : "–"],
+    ];
+    const picked = picks.includes(r.id);
+    show(r.name, `<table class="kv">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join("")}</table>
+      <div class="acts"><button class="btn ${picked ? "on" : ""}" type="button" data-pick="${r.id}">${picked ? "✓ 비교에 담음" : "+ 비교 담기"}</button></div>
+      <p class="note">빈자리는 정원에서 현원을 뺀 추정값이에요. 실제 입소 가능 여부와 비용은 기관에 전화로 확인하세요.</p>`);
+  } catch (e) { show("오류", `<p>${esc(e.message)}</p>`); }
+}
+
+// ---------- 비교 ----------
+function drawTray() { $("#trayN").textContent = picks.length; $("#tray").classList.toggle("show", picks.length > 0); }
+$("#trayClear").addEventListener("click", () => {
+  picks = []; savePicks();
+  document.querySelectorAll("[data-pick]").forEach((b) => { b.classList.remove("on"); b.textContent = "+ 비교 담기"; });
+});
+$("#trayGo").addEventListener("click", async () => {
+  if (picks.length < 2) { alertBox("2곳 이상 담으면 비교할 수 있어요."); return; }
+  show("비교", "불러오는 중…");
+  try {
+    const { rows } = await api({ ids: picks.join(",") });
+    const line = (label, f) => `<tr><th>${label}</th>${rows.map((r) => `<td>${f(r)}</td>`).join("")}</tr>`;
+    show(`${rows.length}곳 비교`, `<div class="cmp"><table>
+      ${line("이름", (r) => `<b>${esc(r.name)}</b>`)}
+      ${line("종류", (r) => esc(r.kind_nm + (r.sub_nm ? ` (${r.sub_nm})` : "")))}
+      ${line("주소", (r) => esc(r.addr || "준비 중"))}
+      ${line("전화", (r) => (r.tel ? `<a href="tel:${esc(r.tel)}">${esc(r.tel)}</a>` : "–"))}
+      ${line("정원", (r) => num(r.capacity))}
+      ${line("현원", (r) => num(r.now))}
+      ${line("빈자리(추정)", (r) => num(r.vacancy))}
+      ${line("대기", (r) => num(r.wait))}
+      ${line("지정일", (r) => day(r.designated))}
+      ${line("주차", (r) => esc(r.parking || "–"))}
+      ${line("홈페이지", (r) => homeLink(r.homepage))}
+      ${line("", (r) => `<button class="btn" type="button" data-unpick="${r.id}">빼기</button>`)}
+    </table></div><p class="note">공단에 신고된 값이에요. 비용·식단·프로그램·분위기는 꼭 방문 상담으로 확인하세요.</p>`);
+  } catch (e) { show("오류", `<p>${esc(e.message)}</p>`); }
+});
+$("#dlgB").addEventListener("click", (e) => {
+  const id = e.target.dataset?.unpick; if (!id) return;
+  picks = picks.filter((x) => x !== id); savePicks();
+  document.querySelectorAll(`[data-pick="${id}"]`).forEach((b) => { b.classList.remove("on"); b.textContent = "+ 비교 담기"; });
+  if (picks.length >= 2) $("#trayGo").click(); else dlg.close();
+});
+
+// ---------- 시작 ----------
+(async function init() {
+  drawKinds(); drawTray();
+  const u = new URLSearchParams(location.search);
+  if (u.has("kind")) state.kinds = u.get("kind").split(",").filter((k) => KINDS.some(([x]) => x === k));
+  state.sido = u.get("sido") || ""; state.sgg = u.get("sgg") || ""; state.q = u.get("q") || "";
+  state.sort = u.get("sort") || "name"; state.page = Number(u.get("page")) || 1;
+  drawKinds(); $("#q").value = state.q; $("#sort").value = state.sort;
+  try {
+    regions = (await api({ mode: "regions" })).sidos;
+    $("#sido").innerHTML = `<option value="">시·도 선택</option>` + regions.map((s) => `<option value="${s.cd}">${esc(s.nm)}</option>`).join("");
+    $("#sido").value = state.sido; drawSgg(); $("#sgg").value = state.sgg;
+    if (state.sido || state.q) search(false);
+  } catch (e) { $("#sido").innerHTML = `<option value="">지역을 불러오지 못했어요</option>`; }
+})();
+</script>
+</body>
+</html>
