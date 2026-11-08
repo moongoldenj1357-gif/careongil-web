@@ -10,7 +10,7 @@ const SB_URL = (process.env.SUPABASE_URL ?? "").trim().replace(/\/+$/, "").repla
 const SB_KEY = process.env.SUPABASE_SECRET_KEY ?? "";
 const H = (x = {}) => ({ apikey: SB_KEY, ...(SB_KEY.startsWith("sb_") ? {} : { Authorization: `Bearer ${SB_KEY}` }), ...x });
 
-const KIND_NM = { home: "요양원", daycare: "주야간보호", short: "단기보호", visit_care: "방문요양", visit_bath: "방문목욕", visit_nurse: "방문간호", tool: "복지용구", other: "기타" };
+const KIND_NM = { home: "요양원", daycare: "주야간보호", short: "단기보호", visit_care: "방문요양", visit_bath: "방문목욕", visit_nurse: "방문간호", tool: "복지용구", other: "기타", unit: "치매전담실" };
 const SORTS = { name: "name.asc", capacity: "capacity.desc.nullslast,name.asc", new: "designated.desc.nullslast,name.asc", old: "designated.asc.nullslast,name.asc" };
 const LIST_COLS = "sym,pttn,name,kind,sido_cd,sgg_cd,addr,tel,capacity,now_m,now_f,wait_m,wait_f,designated,homepage,detail_at";
 const DETAIL_COLS = `${LIST_COLS},addr_detail,post,parking,transport,list_seen,staff,rooms,nonpay,programs,extra_at`;
@@ -21,7 +21,6 @@ const sub = (p) => {
   if (c === "A04") return "공동생활가정";
   if (c === "S41") return "치매전담형 공동생활가정";
   if (c === "A05") return "단기보호 전환";
-  if (/^[GMHI]\d/.test(c)) return "치매전담실";
   return null;
 };
 // 홈페이지 칸에 "없음" 같은 글자가 들어온 경우 걸러냄
@@ -43,6 +42,18 @@ async function sb(path, extra) {
   const t = await r.text();
   if (!r.ok) throw new Error(`DB ${r.status}: ${t.slice(0, 200)}`);
   return { data: t ? JSON.parse(t) : [], range: r.headers.get("content-range") };
+}
+// 같은 기관기호의 치매전담실(G·M = 요양원, H·I = 주야간보호)을 세어 본 기관에 붙임
+async function addUnits(rows) {
+  const syms = [...new Set(rows.filter((r) => r.kind === "home" || r.kind === "daycare").map((r) => r.sym))];
+  if (!syms.length) return rows;
+  const { data } = await sb(`ltc_insts?select=sym,pttn&kind=eq.unit&sym=in.(${syms.join(",")})`);
+  for (const r of rows) {
+    const pre = r.kind === "home" ? /^[GM]/ : /^[HI]/;
+    const n = data.filter((u) => u.sym === r.sym && pre.test(u.pttn)).length;
+    if (n) r.dementia_units = n;
+  }
+  return rows;
 }
 const ID = /^(\d{5,15}):([A-Z]\d{2})$/;
 const parseId = (s) => { const m = String(s || "").trim().toUpperCase().match(ID); return m ? { sym: m[1], pttn: m[2] } : null; };
@@ -69,7 +80,7 @@ export default async function handler(req, res) {
       if (!ids.length) return res.status(400).json({ 오류: "기관 번호가 올바르지 않아요" });
       const or = ids.map((x) => `and(sym.eq.${x.sym},pttn.eq.${x.pttn})`).join(",");
       const { data } = await sb(`ltc_insts?select=${DETAIL_COLS}&or=(${or})`);
-      const rows = ids.map((x) => data.find((r) => r.sym === x.sym && r.pttn === x.pttn)).filter(Boolean).map(shape);
+      const rows = await addUnits(ids.map((x) => data.find((r) => r.sym === x.sym && r.pttn === x.pttn)).filter(Boolean).map(shape));
       res.setHeader("Cache-Control", "public, s-maxage=600, stale-while-revalidate=3600");
       if (q.id) return rows[0] ? res.status(200).json(rows[0]) : res.status(404).json({ 오류: "기관을 찾지 못했어요" });
       return res.status(200).json({ rows });
@@ -92,7 +103,7 @@ export default async function handler(req, res) {
     const { data, range } = await sb(`ltc_insts?${f.join("&")}`, { Prefer: "count=exact" });
     const total = Number(String(range || "").split("/")[1]) || data.length;
     res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=1800");
-    return res.status(200).json({ total, page, pages: Math.max(1, Math.ceil(total / PAGE)), rows: data.map(shape) });
+    return res.status(200).json({ total, page, pages: Math.max(1, Math.ceil(total / PAGE)), rows: await addUnits(data.map(shape)) });
   } catch (e) {
     return res.status(500).json({ 오류: e.message });
   }
