@@ -73,6 +73,7 @@ table.kv th{width:30%;color:var(--sub);font-weight:500;white-space:nowrap}
 .cmp th,.cmp td{border-bottom:1px solid var(--line);padding:9px 8px;text-align:left;vertical-align:top;min-width:150px}
 .cmp th:first-child{position:sticky;left:0;background:#fff;min-width:80px;color:var(--sub);font-weight:500}
 .note{background:var(--warm-soft);border-radius:10px;padding:10px 12px;font-size:.88rem;margin-top:14px}
+.b.g{background:#eef0f3;color:#46505a}.b.gA{background:#2f6b4f;color:#fff}.b.gB{background:#d8eadf;color:#245a40}.b.gD{background:#f6e7d6;color:#8a5520}.b.gE{background:#f5dcd7;color:#a33b2b}
 h4.sec{margin:20px 0 6px;font-size:1rem;color:var(--main)}
 ul.pg{margin:0;padding-left:18px}ul.pg li{margin:3px 0}
 footer{background:#ebe6dc;color:var(--sub);font-size:.82rem;padding:24px 0 90px;margin-top:30px}
@@ -103,6 +104,7 @@ footer p{margin:4px 0}
           <option value="capacity">정원 많은 순</option>
           <option value="new">최근 지정 순</option>
           <option value="old">오래된 기관 순</option>
+          <option value="grade">평가 등급 순</option>
         </select></div>
     </div>
     <div class="chips" id="kinds" role="group" aria-label="기관 종류"></div>
@@ -185,6 +187,8 @@ function toUrl() {
 }
 
 // ---------- 목록 ----------
+const gradeBadge = (r) => (r.eval_grade ? `<span class="b g g${r.eval_grade}" title="국민건강보험공단 ${r.eval_year}년 평가">평가 ${r.eval_grade}등급 <small>(${r.eval_year})</small></span>` : "");
+const GRADE_NM = { A: "최우수", B: "우수", C: "양호", D: "보통", E: "미흡" };
 const regionName = (r) => {
   const s = regions.find((x) => x.cd === r.sido_cd);
   return s?.sggs.find((g) => g.cd === r.sgg_cd)?.nm || s?.nm || "";
@@ -197,7 +201,7 @@ function card(r) {
       <div class="vac"><b>${num(r.vacancy)}</b><small>빈자리(추정)</small></div>
       <div><b>${num(r.wait)}</b><small>대기</small></div></div>` : "";
   return `<article class="card">
-    <div class="badges"><span class="b">${esc(r.kind_nm)}</span>${r.sub_nm ? `<span class="b w">${esc(r.sub_nm)}</span>` : ""}${r.dementia_units ? `<span class="b w">치매전담실 ${r.dementia_units}실</span>` : ""}</div>
+    <div class="badges"><span class="b">${esc(r.kind_nm)}</span>${r.sub_nm ? `<span class="b w">${esc(r.sub_nm)}</span>` : ""}${r.dementia_units ? `<span class="b w">치매전담실 ${r.dementia_units}실</span>` : ""}${gradeBadge(r)}</div>
     <h3>${esc(r.name)}</h3>
     <p class="addr">${r.addr ? esc(r.addr) : esc(regionName(r)) + ' <span class="muted">· 상세 정보 준비 중</span>'}</p>
     ${nums}
@@ -254,6 +258,18 @@ const mapLink = (r) => (r.addr ? `https://map.kakao.com/link/search/${encodeURIC
 const homeLink = (u) => (/^https?:\/\//.test(u || "") ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(u)}</a>` : "–");
 const won = (v) => (v == null ? "–" : Number(v).toLocaleString("ko-KR") + "원");
 const nz = (o) => Object.entries(o || {}).filter(([, v]) => v);
+function evalHtml(r) {
+  const ev = Array.isArray(r.evals) ? r.evals : [];
+  if (!ev.length) return `<h4 class="sec">공단 평가</h4><p class="muted">평가 결과가 없어요. 지정된 지 3년이 안 된 기관이거나 평가 대상이 아니었을 수 있어요.</p>`;
+  const now = ev[0];
+  const areas = Object.entries(now.areas || {}).map(([k, v]) => `${esc(k)} <b>${v}</b>`).join(" · ");
+  return `<h4 class="sec">공단 평가</h4>
+    <p><span class="b g g${now.grade}" style="font-size:.95rem">${now.grade}등급 · ${GRADE_NM[now.grade] || ""}</span>
+      <span class="muted">${esc(now.round)} · ${now.score}점 · ${esc(now.eval_date)}</span></p>
+    ${areas ? `<p class="muted">영역별 점수: ${areas}</p>` : ""}
+    ${ev.length > 1 ? `<p class="muted">지난 평가: ${ev.slice(1).map((x) => `${esc(x.round)} <b>${x.grade}</b>`).join(" · ")}</p>` : ""}
+    <p class="muted">국민건강보험공단이 3년마다 하는 평가예요. A 최우수 · B 우수 · C 양호 · D 보통 · E 미흡.</p>`;
+}
 function extraHtml(r) {
   if (!STAY.has(r.kind)) return "";
   if (!r.extra_at) return `<p class="muted" style="margin-top:14px">비용·인력·시설 정보는 수집 중이에요. 며칠 안에 채워집니다.</p>`;
@@ -293,6 +309,7 @@ async function openDetail(id) {
     ];
     const picked = picks.includes(r.id);
     show(r.name, `<table class="kv">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join("")}</table>
+      ${evalHtml(r)}
       ${extraHtml(r)}
       <div class="acts"><button class="btn ${picked ? "on" : ""}" type="button" data-pick="${r.id}">${picked ? "✓ 비교에 담음" : "+ 비교 담기"}</button></div>
       <p class="note">빈자리는 정원에서 현원을 뺀 추정값이에요. 실제 입소 가능 여부와 비용은 기관에 전화로 확인하세요.</p>`);
@@ -314,6 +331,7 @@ $("#trayGo").addEventListener("click", async () => {
     show(`${rows.length}곳 비교`, `<div class="cmp"><table>
       ${line("이름", (r) => `<b>${esc(r.name)}</b>`)}
       ${line("종류", (r) => esc(r.kind_nm + (r.sub_nm ? ` (${r.sub_nm})` : "")))}
+      ${line("공단 평가", (r) => (r.eval_grade ? `<b>${r.eval_grade}등급</b> <span class="muted">(${r.eval_year})</span>` : "–"))}
       ${line("치매전담실", (r) => (r.dementia_units ? `${r.dementia_units}실` : "–"))}
       ${line("주소", (r) => esc(r.addr || "준비 중"))}
       ${line("전화", (r) => (r.tel ? `<a href="tel:${esc(r.tel)}">${esc(r.tel)}</a>` : "–"))}
