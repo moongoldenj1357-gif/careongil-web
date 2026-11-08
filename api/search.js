@@ -13,21 +13,30 @@ const H = (x = {}) => ({ apikey: SB_KEY, ...(SB_KEY.startsWith("sb_") ? {} : { A
 const KIND_NM = { home: "요양원", daycare: "주야간보호", short: "단기보호", visit_care: "방문요양", visit_bath: "방문목욕", visit_nurse: "방문간호", tool: "복지용구", other: "기타" };
 const SORTS = { name: "name.asc", capacity: "capacity.desc.nullslast,name.asc", new: "designated.desc.nullslast,name.asc", old: "designated.asc.nullslast,name.asc" };
 const LIST_COLS = "sym,pttn,name,kind,sido_cd,sgg_cd,addr,tel,capacity,now_m,now_f,wait_m,wait_f,designated,homepage,detail_at";
-const DETAIL_COLS = `${LIST_COLS},addr_detail,post,parking,transport,list_seen`;
+const DETAIL_COLS = `${LIST_COLS},addr_detail,post,parking,transport,list_seen,staff,rooms,nonpay,programs,extra_at`;
 const PAGE = 20;
 
 const sub = (p) => {
   const c = String(p || "").toUpperCase();
   if (c === "A04") return "공동생활가정";
-  if (/^I3/.test(c)) return "치매전담형";
+  if (c === "S41") return "치매전담형 공동생활가정";
+  if (c === "A05") return "단기보호 전환";
+  if (/^[GMHI]\d/.test(c)) return "치매전담실";
   return null;
 };
+// 홈페이지 칸에 "없음" 같은 글자가 들어온 경우 걸러냄
+const site = (u) => { const h = String(u || "").replace(/^https?:\/\//i, "").trim(); return /\.[a-z가-힣]{2,}/i.test(h) ? u : null; };
 const sum = (a, b) => (a == null && b == null ? null : (a || 0) + (b || 0));
 // 화면에서 바로 쓰도록 숫자를 정리
 function shape(r) {
   const now = sum(r.now_m, r.now_f), wait = sum(r.wait_m, r.wait_f);
-  return { ...r, id: `${r.sym}:${r.pttn}`, kind_nm: KIND_NM[r.kind] || "기타", sub_nm: sub(r.pttn), now, wait,
-    vacancy: r.capacity != null && now != null ? Math.max(0, r.capacity - now) : null, has_detail: !!r.detail_at };
+  const st = r.staff || null, rm = r.rooms || null;
+  return { ...r, homepage: site(r.homepage), id: `${r.sym}:${r.pttn}`, kind_nm: KIND_NM[r.kind] || "기타", sub_nm: sub(r.pttn), now, wait,
+    vacancy: r.capacity != null && now != null ? Math.max(0, r.capacity - now) : null, has_detail: !!r.detail_at,
+    // 비교표용 요약
+    ...(st ? { care_workers: st.요양보호사 ?? null, nurses: (st.간호사 || 0) + (st.간호조무사 || 0) } : {}),
+    ...(rm ? { beds: ["1인실", "2인실", "3인실", "4인실"].map((k) => `${k} ${rm[k] || 0}`).join(" · ") } : {}),
+    ...(Array.isArray(r.nonpay) ? { food: r.nonpay.find((x) => x.종류 === "식재료비") || null } : {}) };
 }
 async function sb(path, extra) {
   const r = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: H(extra) });

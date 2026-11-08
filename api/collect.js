@@ -2,7 +2,7 @@
 //  ?code=관리자코드&mode=list    → 전국 목록(모든 유형) 한 바퀴 (이어하기)
 //  ?code=관리자코드&mode=detail  → 상세가 없거나 30일 지난 기관부터 채움 (하루 9,000번 안쪽)
 //  ?code=관리자코드&mode=status  → 진행 상황
-import { SIDOS, PRIORITY, listPage, detail } from "../lib/ltc.js";
+import { SIDOS, PRIORITY, STAY, listPage, detail } from "../lib/ltc.js";
 export const config = { maxDuration: 60 };
 const SB_URL = (process.env.SUPABASE_URL ?? "").trim().replace(/\/+$/, "").replace(/\/rest\/v1$/, "");
 const SB_KEY = process.env.SUPABASE_SECRET_KEY ?? "";
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     if (q.mode === "status") {
       const [L, D] = await Promise.all([getState("list"), getState("detail")]);
       const cnt = async (f) => { const r = await fetch(`${SB_URL}/rest/v1/ltc_insts?select=sym&${f}`, { method: "HEAD", headers: H({ Prefer: "count=exact", Range: "0-0" }) }); return Number((r.headers.get("content-range") || "/0").split("/")[1]); };
-      const by = {}; for (const k of [...PRIORITY, "tool"]) by[k] = { 전체: await cnt(`kind=eq.${k}`), 상세완료: await cnt(`kind=eq.${k}&detail_at=not.is.null`) };
+      const by = {}; for (const k of [...PRIORITY, "tool"]) by[k] = { 전체: await cnt(`kind=eq.${k}`), 상세완료: await cnt(`kind=eq.${k}&detail_at=not.is.null`), ...(STAY.includes(k) ? { 비급여등완료: await cnt(`kind=eq.${k}&extra_at=not.is.null`) } : {}) };
       return res.status(200).json({ 목록: L, 상세: D, 종류별: by });
     }
     if (q.mode === "list") {
@@ -50,15 +50,18 @@ export default async function handler(req, res) {
       let worked = 0;
       for (const kind of PRIORITY) {
         while (left() > 10000 && d.calls < DAILY_DETAIL) {
-          const rows = await sb("GET", `ltc_insts?select=sym,pttn,kind&kind=eq.${kind}&or=(detail_at.is.null,detail_at.lt.${old})&order=detail_at.asc.nullsfirst&limit=3`);
+          // 입소형은 인력·시설·비급여(extra_at)가 아직 없는 곳도 다시 받음
+          const need = STAY.includes(kind) ? `or=(detail_at.is.null,detail_at.lt.${old},extra_at.is.null)` : `or=(detail_at.is.null,detail_at.lt.${old})`;
+          const rows = await sb("GET", `ltc_insts?select=sym,pttn,kind&kind=eq.${kind}&${need}&order=detail_at.asc.nullsfirst&limit=3`);
           if (!rows.length) break;
           const outs = await Promise.all(rows.map(async (r) => {
             try { const x = await detail(r.sym, r.pttn, r.kind); d.calls += x.calls; return { ...r, ...x.row }; }
             catch (e) {
-              d.errors++; d.calls += 2; d.lastErr = e.message.slice(0, 120);
+              d.errors++; d.calls += STAY.includes(r.kind) ? 4 : 2; d.lastErr = e.message.slice(0, 120);
               if (/오늘 호출 한도/.test(e.message)) d.calls = DAILY_DETAIL;
               // 실패한 곳은 내일 다시 받도록 (29일 전으로 표시)
-              return { ...r, detail_at: new Date(Date.now() - 29 * 864e5).toISOString(), detail_err: e.message.slice(0, 200) };
+              const back = new Date(Date.now() - 29 * 864e5).toISOString();
+              return { ...r, detail_at: back, ...(STAY.includes(r.kind) ? { extra_at: back } : {}), detail_err: e.message.slice(0, 200) };
             }
           }));
           for (const o of outs) { const { sym, pttn, kind: _k, ...patch } = o; await sb("PATCH", `ltc_insts?sym=eq.${sym}&pttn=eq.${encodeURIComponent(pttn)}`, patch, { Prefer: "return=minimal" }); }
