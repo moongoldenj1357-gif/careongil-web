@@ -2,7 +2,7 @@
 //  /api/search?mode=regions                                   → 시도·시군구 이름 표
 //  /api/search?sido=41&sgg=110&kind=home&q=이름&sort=name&page=1 → 목록 (한 쪽 20곳)
 //      kind는 쉼표로 여러 개 가능(home,daycare). sido 없이 쓰려면 q(이름 2글자 이상) 필요.
-//      sort: name(이름순) | capacity(정원 큰 순) | new(최근 지정) | old(오래된 곳)
+//      sort: name(이름순) | capacity(정원 큰 순) | new(최근 지정) | old(오래된 곳) | grade(평가 등급 순)
 //  /api/search?id=기관기호:유형코드                           → 1곳 상세
 //  /api/search?ids=기호:유형,기호:유형 (최대 5곳)              → 비교
 export const config = { maxDuration: 15 };
@@ -11,8 +11,8 @@ const SB_KEY = process.env.SUPABASE_SECRET_KEY ?? "";
 const H = (x = {}) => ({ apikey: SB_KEY, ...(SB_KEY.startsWith("sb_") ? {} : { Authorization: `Bearer ${SB_KEY}` }), ...x });
 
 const KIND_NM = { home: "요양원", daycare: "주야간보호", short: "단기보호", visit_care: "방문요양", visit_bath: "방문목욕", visit_nurse: "방문간호", tool: "복지용구", other: "기타", unit: "치매전담실" };
-const SORTS = { name: "name.asc", capacity: "capacity.desc.nullslast,name.asc", new: "designated.desc.nullslast,name.asc", old: "designated.asc.nullslast,name.asc" };
-const LIST_COLS = "sym,pttn,name,kind,sido_cd,sgg_cd,addr,tel,capacity,now_m,now_f,wait_m,wait_f,designated,homepage,detail_at";
+const SORTS = { name: "name.asc", capacity: "capacity.desc.nullslast,name.asc", new: "designated.desc.nullslast,name.asc", old: "designated.asc.nullslast,name.asc", grade: "eval_grade.asc.nullslast,name.asc" };
+const LIST_COLS = "sym,pttn,name,kind,sido_cd,sgg_cd,addr,tel,capacity,now_m,now_f,wait_m,wait_f,designated,homepage,detail_at,eval_grade,eval_year";
 const DETAIL_COLS = `${LIST_COLS},addr_detail,post,parking,transport,list_seen,staff,rooms,nonpay,programs,extra_at`;
 const PAGE = 20;
 
@@ -82,7 +82,13 @@ export default async function handler(req, res) {
       const { data } = await sb(`ltc_insts?select=${DETAIL_COLS}&or=(${or})`);
       const rows = await addUnits(ids.map((x) => data.find((r) => r.sym === x.sym && r.pttn === x.pttn)).filter(Boolean).map(shape));
       res.setHeader("Cache-Control", "public, s-maxage=600, stale-while-revalidate=3600");
-      if (q.id) return rows[0] ? res.status(200).json(rows[0]) : res.status(404).json({ 오류: "기관을 찾지 못했어요" });
+      if (q.id) {
+        if (!rows[0]) return res.status(404).json({ 오류: "기관을 찾지 못했어요" });
+        // 평가 이력 (국민건강보험공단 정기·수시평가)
+        const r = rows[0];
+        const { data: ev } = await sb(`ltc_evals?select=round,etype,eval_date,grade,score,size,areas&sym=eq.${r.sym}&kind=eq.${r.kind}&order=eval_date.desc`).catch(() => ({ data: [] }));
+        return res.status(200).json({ ...r, evals: ev });
+      }
       return res.status(200).json({ rows });
     }
 
