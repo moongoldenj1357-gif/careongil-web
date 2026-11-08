@@ -77,13 +77,13 @@ export default async function handler(req, res) {
     // 2) 한 곳 또는 여러 곳(비교)
     if (q.id || q.ids) {
       const ids = String(q.id || q.ids).split(",").map(parseId).filter(Boolean).slice(0, 5);
-      if (!ids.length) return res.status(400).json({ 오류: "기관 번호가 올바르지 않아요" });
+      if (!ids.length) return res.status(400).json({ 오류: "기관 번호가 올바르지 않습니다" });
       const or = ids.map((x) => `and(sym.eq.${x.sym},pttn.eq.${x.pttn})`).join(",");
       const { data } = await sb(`ltc_insts?select=${DETAIL_COLS}&or=(${or})`);
       const rows = await addUnits(ids.map((x) => data.find((r) => r.sym === x.sym && r.pttn === x.pttn)).filter(Boolean).map(shape));
       res.setHeader("Cache-Control", "public, s-maxage=600, stale-while-revalidate=3600");
       if (q.id) {
-        if (!rows[0]) return res.status(404).json({ 오류: "기관을 찾지 못했어요" });
+        if (!rows[0]) return res.status(404).json({ 오류: "기관을 찾지 못했습니다" });
         // 평가 이력 (국민건강보험공단 정기·수시평가)
         const r = rows[0];
         const { data: ev } = await sb(`ltc_evals?select=round,etype,eval_date,grade,score,size,areas&sym=eq.${r.sym}&kind=eq.${r.kind}&order=eval_date.desc`).catch(() => ({ data: [] }));
@@ -96,7 +96,7 @@ export default async function handler(req, res) {
     const sido = /^\d{2}$/.test(q.sido || "") ? q.sido : null;
     const sgg = /^\d{3}$/.test(q.sgg || "") ? q.sgg : null;
     const name = String(q.q || "").replace(/[*,()%\\.:"'`;=&]/g, " ").trim().slice(0, 30);
-    if (!sido && name.length < 2) return res.status(400).json({ 오류: "지역(시도)을 고르거나 이름을 2글자 이상 넣어 주세요" });
+    if (!sido && name.length < 2) return res.status(400).json({ 오류: "시·도를 고르시거나 기관 이름을 2글자 이상 넣어 주시면 됩니다" });
     const kinds = String(q.kind || "").split(",").map((k) => k.trim()).filter((k) => k in KIND_NM);
     const page = Math.min(Math.max(parseInt(q.page, 10) || 1, 1), 500);
     const f = [`select=${LIST_COLS}`];

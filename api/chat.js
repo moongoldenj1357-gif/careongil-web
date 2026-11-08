@@ -59,9 +59,9 @@ async function facts(ids) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({ 오류: "POST로 보내 주세요" });
-  if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ 오류: "AI 상담이 아직 준비 중이에요" });
-  if (!SB_URL || !SB_KEY) return res.status(500).json({ 오류: "서버 설정이 없어요" });
+  if (req.method !== "POST") return res.status(405).json({ 오류: "잘못된 요청입니다" });
+  if (!process.env.ANTHROPIC_API_KEY) return res.status(503).json({ 오류: "AI 상담을 준비하고 있습니다. 조금 뒤에 이용해 주시기 바랍니다." });
+  if (!SB_URL || !SB_KEY) return res.status(500).json({ 오류: "서버 설정을 확인하고 있습니다" });
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
   // 최근 10개 메시지만, 한 메시지는 1,000자까지
@@ -69,7 +69,7 @@ export default async function handler(req, res) {
     .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim())
     .slice(-10).map((m) => ({ role: m.role, content: m.content.slice(0, 1000) }));
   while (msgs.length && msgs[0].role !== "user") msgs.shift();
-  if (!msgs.length || msgs[msgs.length - 1].role !== "user") return res.status(400).json({ 오류: "질문을 입력해 주세요" });
+  if (!msgs.length || msgs[msgs.length - 1].role !== "user") return res.status(400).json({ 오류: "질문을 입력해 주시기 바랍니다" });
 
   try {
     // 하루 횟수 확인 (IP는 해시로만 씀)
@@ -77,7 +77,7 @@ export default async function handler(req, res) {
     const who = createHash("sha256").update(ip + "|" + SB_KEY.slice(-16)).digest("hex").slice(0, 32);
     const take = await sb("POST", "rpc/chat_take", { p_who: who, p_user_max: USER_MAX, p_site_max: SITE_MAX });
     if (!take?.ok) {
-      const msg = take?.why === "site" ? "오늘 AI 상담이 모두 마감됐어요. 내일 다시 이용해 주세요." : `오늘 무료 상담 ${USER_MAX}번을 모두 쓰셨어요. 내일 다시 이용해 주세요.`;
+      const msg = take?.why === "site" ? "오늘 AI 상담이 모두 마감되었습니다. 내일 다시 이용해 주시면 감사하겠습니다. 위의 자주 묻는 질문은 계속 보실 수 있습니다." : `오늘 무료 상담 ${USER_MAX}번을 모두 이용하셨습니다. 내일 다시 이용해 주시면 감사하겠습니다. 위의 자주 묻는 질문은 계속 보실 수 있습니다.`;
       return res.status(429).json({ 오류: msg, left: 0 });
     }
     const f = await facts(body?.ctx).catch(() => "");
@@ -91,8 +91,8 @@ export default async function handler(req, res) {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j?.error?.message || `AI 응답 오류 ${r.status}`);
     const reply = (j.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n").trim();
-    return res.status(200).json({ reply: reply || "답을 만들지 못했어요. 질문을 조금 바꿔 다시 물어봐 주세요.", left: take.left });
+    return res.status(200).json({ reply: reply || "답변을 만들지 못했습니다. 질문을 조금 바꿔서 다시 물어봐 주시면 감사하겠습니다.", left: take.left });
   } catch (e) {
-    return res.status(500).json({ 오류: "잠시 후 다시 시도해 주세요.", 상세: String(e.message).slice(0, 120) });
+    return res.status(500).json({ 오류: "잠시 후 다시 시도해 주시기 바랍니다.", 상세: String(e.message).slice(0, 120) });
   }
 }
