@@ -34,6 +34,24 @@ select,input[type=search]{width:100%;padding:11px 12px;border:1px solid var(--li
 .chip[aria-pressed=true]{background:var(--main);border-color:var(--main);color:#fff}
 .go{width:100%;margin-top:12px;padding:13px;border:0;border-radius:10px;background:var(--main);color:#fff;font-weight:700;font-size:1.05rem;cursor:pointer}
 .go:hover{filter:brightness(1.08)}
+#nav{display:flex;gap:6px;margin-top:16px;flex-wrap:wrap}
+#nav button{border:0;background:rgba(255,255,255,.14);color:#fff;border-radius:999px;padding:7px 14px;cursor:pointer}
+#nav button[aria-current=page]{background:#fff;color:var(--main);font-weight:700}
+.page[hidden]{display:none}
+.panel{background:var(--card);border-radius:var(--r);box-shadow:0 6px 24px rgba(31,42,36,.08);padding:20px;margin-top:-46px;margin-bottom:18px}
+.panel+.panel{margin-top:0}
+.panel h2{margin:0 0 12px;font-size:1.25rem}.panel h3{font-size:1.05rem;margin:20px 0 6px}
+ol.steps{margin:0;padding:0;list-style:none;counter-reset:s}
+ol.steps li{counter-increment:s;position:relative;padding:12px 0 12px 46px;border-bottom:1px solid var(--line)}
+ol.steps li:last-child{border-bottom:0}
+ol.steps li::before{content:counter(s);position:absolute;left:0;top:12px;width:32px;height:32px;border-radius:50%;background:var(--main);color:#fff;display:grid;place-items:center;font-weight:700}
+ol.steps b{display:block;font-size:1.05rem}ol.steps span{color:var(--sub)}
+table.tbl{border-collapse:collapse;width:100%}table.tbl th,table.tbl td{border-bottom:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}table.tbl th{color:var(--sub);font-weight:500;background:var(--bg)}
+input.in{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.result{margin-top:18px;border-top:2px solid var(--main);padding-top:12px}
+.big{display:flex;justify-content:space-between;align-items:baseline;background:var(--main-soft);border-radius:12px;padding:14px 16px;margin-bottom:8px}
+.big small{color:var(--main)}.big b{font-size:1.6rem;color:var(--main)}
+b.bad{color:var(--bad)}
 .meta{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:22px 0 10px;flex-wrap:wrap}
 .meta h2{font-size:1.1rem;margin:0}
 .list{display:grid;gap:12px}
@@ -90,10 +108,11 @@ footer p{margin:4px 0}
   <div class="wrap">
     <p class="logo">케어<span>온</span>길</p>
     <p class="tag">부모님 돌봄, 가까운 장기요양기관을 찾고 비교하세요</p>
+    <nav id="nav"><button type="button" data-p="find" aria-current="page">기관 찾기</button><button type="button" data-p="guide">이용 안내 · 등급</button><button type="button" data-p="calc">비용 계산기</button></nav>
   </div>
 </header>
 
-<main class="wrap">
+<main class="wrap page" id="find">
   <form class="search" id="form" autocomplete="off">
     <div class="row three">
       <div><label class="f" for="sido">시·도</label><select id="sido"><option value="">불러오는 중…</option></select></div>
@@ -117,6 +136,89 @@ footer p{margin:4px 0}
   <div class="list" id="list"></div>
   <div class="pager" id="pager"></div>
 </main>
+<section class="wrap page" id="guide" hidden>
+  <div class="panel">
+    <h2>처음이세요? 5단계로 보는 장기요양 이용</h2>
+    <ol class="steps">
+      <li><b>등급 신청</b><span>만 65세 이상이거나, 65세 미만이라도 치매·뇌혈관질환 같은 노인성 질병이 있으면 신청할 수 있어요. 국민건강보험공단 지사에 가거나 전화(1577-1000), 장기요양보험 누리집에서 신청합니다. 가족이 대신 신청해도 돼요.</span></li>
+      <li><b>방문 조사 · 의사소견서</b><span>공단 직원이 집(또는 병원)에 와서 몸 상태와 일상생활 능력을 조사해요. 의사소견서도 내야 합니다. 평소 어려운 점을 미리 적어 두었다가 솔직히 말씀하세요.</span></li>
+      <li><b>등급 판정</b><span>등급판정위원회가 원칙적으로 신청일로부터 30일 안에 등급을 정해요. 장기요양인정서와 개인별장기요양이용계획서를 받으면, 어떤 서비스를 얼마나 쓸 수 있는지와 본인부담 감경 여부가 적혀 있어요.</span></li>
+      <li><b>기관 찾기 · 비교 · 상담</b><span>케어온길에서 지역과 종류로 찾고 평가 등급·정원·비용을 비교하세요. 마음에 드는 2~3곳은 꼭 직접 가 보거나 전화로 빈자리, 식사, 프로그램, 비급여 비용을 물어보세요.</span></li>
+      <li><b>계약하고 이용 시작</b><span>장기요양인정서를 가지고 기관과 급여 계약을 맺어요. 매달 본인부담금과 비급여 비용 내역서를 받아 확인하세요.</span></li>
+    </ol>
+  </div>
+  <div class="panel">
+    <h2>장기요양 등급 한눈에 보기</h2>
+    <div class="cmp"><table class="tbl">
+      <tr><th>등급</th><th>인정 점수</th><th>상태</th><th>쓸 수 있는 서비스</th></tr>
+      <tr><td><b>1등급</b></td><td>95점 이상</td><td>일상생활 전부 도움 필요</td><td>요양원 · 재가 모두</td></tr>
+      <tr><td><b>2등급</b></td><td>75~95점 미만</td><td>상당 부분 도움 필요</td><td>요양원 · 재가 모두</td></tr>
+      <tr><td><b>3등급</b></td><td>60~75점 미만</td><td>부분적으로 도움 필요</td><td>재가 (요양원은 예외적으로만)</td></tr>
+      <tr><td><b>4등급</b></td><td>51~60점 미만</td><td>일정 부분 도움 필요</td><td>재가</td></tr>
+      <tr><td><b>5등급</b></td><td>45~51점 미만 + 치매</td><td>치매 환자</td><td>재가</td></tr>
+      <tr><td><b>인지지원</b></td><td>45점 미만 + 치매</td><td>치매 환자</td><td>주야간보호 · 단기보호 등 (방문요양은 안 됨)</td></tr>
+    </table></div>
+    <p class="muted">재가 = 집에서 받는 서비스(방문요양 · 방문목욕 · 방문간호 · 주야간보호 · 단기보호).</p>
+    <h3>2026년 재가급여 월 한도액</h3>
+    <p>1등급 <b>2,512,900원</b> · 2등급 <b>2,331,200원</b> · 3등급 <b>1,528,200원</b> · 4등급 <b>1,409,700원</b> · 5등급 <b>1,208,900원</b> · 인지지원 <b>676,320원</b></p>
+    <p class="muted">한도 안에서 쓴 금액은 본인이 일부만 내고(일반 15%), 한도를 넘긴 금액은 전부 본인이 냅니다.</p>
+    <h3>본인부담률</h3>
+    <div class="cmp"><table class="tbl">
+      <tr><th>구분</th><th>재가급여</th><th>시설급여(요양원)</th></tr>
+      <tr><td>일반</td><td>15%</td><td>20%</td></tr>
+      <tr><td>40% 감경</td><td>9%</td><td>12%</td></tr>
+      <tr><td>60% 감경</td><td>6%</td><td>8%</td></tr>
+      <tr><td>기초생활수급자(의료급여)</td><td>없음</td><td>없음</td></tr>
+    </table></div>
+    <p class="muted">감경 여부는 공단이 건강보험료 순위·재산 등으로 정해 장기요양인정서에 적어 보내요. 식재료비·상급침실료·이미용비 같은 <b>비급여는 감경 없이 전액 본인부담</b>이에요.</p>
+  </div>
+</section>
+
+<section class="wrap page" id="calc" hidden>
+  <div class="panel">
+    <h2>한 달 비용 계산기</h2>
+    <p class="muted">2026년 보건복지부 고시 수가 기준의 대략 계산이에요. 야간·공휴일·중증 가산 등은 빠져 있어요.</p>
+    <div class="chips" id="cMode" role="group" aria-label="이용 방식">
+      <button type="button" class="chip" data-m="stay" aria-pressed="true">요양원에 들어가면</button>
+      <button type="button" class="chip" data-m="home" aria-pressed="false">집에서 재가 서비스</button>
+    </div>
+    <div class="row three">
+      <div><label class="f" for="cGrade">등급</label><select id="cGrade"></select></div>
+      <div><label class="f" for="cRate">본인부담 유형</label>
+        <select id="cRate"><option value="0">일반</option><option value="40">40% 감경</option><option value="60">60% 감경</option><option value="100">기초생활수급자(면제)</option></select></div>
+      <div id="cStayType"><label class="f" for="cFac">시설 종류</label>
+        <select id="cFac"><option value="home">노인요양시설(요양원)</option><option value="group">노인요양공동생활가정</option></select></div>
+    </div>
+
+    <div id="cStay">
+      <div class="row three" style="margin-top:10px">
+        <div><label class="f" for="cDays">한 달 이용일</label><input class="in" type="number" id="cDays" value="30" min="0" max="31"></div>
+        <div><label class="f" for="cFood">식재료비 (하루, 원)</label><input class="in" type="number" id="cFood" placeholder="예: 7500" min="0"></div>
+        <div><label class="f" for="cEtc">기타 비급여 (한 달, 원)</label><input class="in" type="number" id="cEtc" placeholder="이미용·상급침실·간식 등" min="0"></div>
+      </div>
+    </div>
+
+    <div id="cHome" hidden>
+      <div class="row three" style="margin-top:10px">
+        <div><label class="f" for="cVisitMin">방문요양 1회 시간</label><select id="cVisitMin"></select></div>
+        <div><label class="f" for="cVisitN">방문요양 횟수 (한 달)</label><input class="in" type="number" id="cVisitN" value="0" min="0" max="93"></div>
+        <div><label class="f" for="cBathN">방문목욕 횟수 (한 달)</label><input class="in" type="number" id="cBathN" value="0" min="0" max="31"></div>
+      </div>
+      <div class="row three" style="margin-top:10px">
+        <div><label class="f" for="cDayH">주야간보호 하루 시간</label><select id="cDayH"></select></div>
+        <div><label class="f" for="cDayN">주야간보호 일수 (한 달)</label><input class="in" type="number" id="cDayN" value="0" min="0" max="31"></div>
+        <div><label class="f" for="cShortN">단기보호 일수 (한 달)</label><input class="in" type="number" id="cShortN" value="0" min="0" max="31"></div>
+      </div>
+      <div class="row three" style="margin-top:10px">
+        <div><label class="f" for="cMeal">주야간 식사·간식비 (하루, 원)</label><input class="in" type="number" id="cMeal" placeholder="예: 5000" min="0"></div>
+        <div><label class="f" for="cEtc2">기타 비급여 (한 달, 원)</label><input class="in" type="number" id="cEtc2" placeholder="없으면 비워 두세요" min="0"></div>
+      </div>
+    </div>
+
+    <div class="result" id="cOut"></div>
+    <p class="muted" id="cNote"></p>
+  </div>
+</section>
 
 <div class="tray" id="tray"><div class="wrap">
   <span><b id="trayN">0</b>/5곳 담음 <button class="btn" type="button" id="trayClear" style="margin-left:6px">비우기</button></span>
@@ -311,8 +413,10 @@ async function openDetail(id) {
     show(r.name, `<table class="kv">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join("")}</table>
       ${evalHtml(r)}
       ${extraHtml(r)}
-      <div class="acts"><button class="btn ${picked ? "on" : ""}" type="button" data-pick="${r.id}">${picked ? "✓ 비교에 담음" : "+ 비교 담기"}</button></div>
+      <div class="acts"><button class="btn ${picked ? "on" : ""}" type="button" data-pick="${r.id}">${picked ? "✓ 비교에 담음" : "+ 비교 담기"}</button>
+        ${["home", "daycare", "short"].includes(r.kind) ? `<button class="btn pri" type="button" id="toCalc">이 기관 비용 계산</button>` : ""}</div>
       <p class="note">빈자리는 정원에서 현원을 뺀 추정값이에요. 실제 입소 가능 여부와 비용은 기관에 전화로 확인하세요.</p>`);
+    const tc = $("#toCalc"); if (tc) tc.onclick = () => toCalc(r);
   } catch (e) { show("오류", `<p>${esc(e.message)}</p>`); }
 }
 
@@ -358,6 +462,107 @@ $("#dlgB").addEventListener("click", (e) => {
   document.querySelectorAll(`[data-pick="${id}"]`).forEach((b) => { b.classList.remove("on"); b.textContent = "+ 비교 담기"; });
   if (picks.length >= 2) $("#trayGo").click(); else dlg.close();
 });
+
+// ---------- 이용 안내 · 비용 계산기 (2026년 보건복지부 고시 수가, 2025.11.4 장기요양위원회 의결) ----------
+const FEE = {
+  home: { 1: 93070, 2: 86340, 3: 81540, 4: 81540, 5: 81540 },
+  group: { 1: 74590, 2: 69210, 3: 63800, 4: 63800, 5: 63800 },
+  short: { 1: 74060, 2: 68580, 3: 63350, 4: 61680, 5: 60000 },
+  day: {
+    "3~6시간": { 1: 41820, 2: 38720, 3: 35740, 4: 34120, 5: 32490, c: 32490 },
+    "6~8시간": { 1: 56060, 2: 51930, 3: 47940, 4: 46300, 5: 44650, c: 44650 },
+    "8~10시간": { 1: 69730, 2: 64590, 3: 59640, 4: 58010, 5: 56360, c: 56360 },
+    "10~13시간": { 1: 76820, 2: 71160, 3: 65750, 4: 64090, 5: 62460, c: 56360 },
+    "13시간 초과": { 1: 82370, 2: 76310, 3: 70500, 4: 68860, 5: 67240, c: 56360 },
+  },
+  visit: { 30: 17450, 60: 25320, 90: 34120, 120: 43430, 150: 50640, 180: 57020, 210: 63530, 240: 70080 },
+  bath: 80230,   // 방문목욕 차량이용(가정 내)
+};
+const LIMIT = { 1: 2512900, 2: 2331200, 3: 1528200, 4: 1409700, 5: 1208900, c: 676320 };
+const RATE = { stay: { 0: 0.2, 40: 0.12, 60: 0.08, 100: 0 }, home: { 0: 0.15, 40: 0.09, 60: 0.06, 100: 0 } };
+let cMode = "stay";
+const v = (id) => Math.max(0, Number($(id).value) || 0);
+const r10 = (x) => Math.round(x / 10) * 10;
+const W = (x) => Number(r10(x)).toLocaleString("ko-KR") + "원";
+function fillGrades() {
+  const cur = $("#cGrade").value;
+  const opts = cMode === "stay" ? [["1", "1등급"], ["2", "2등급"], ["3", "3~5등급"]] : [["1", "1등급"], ["2", "2등급"], ["3", "3등급"], ["4", "4등급"], ["5", "5등급"], ["c", "인지지원등급"]];
+  $("#cGrade").innerHTML = opts.map(([k, n]) => `<option value="${k}">${n}</option>`).join("");
+  if (opts.some(([k]) => k === cur)) $("#cGrade").value = cur;
+}
+function calc() {
+  const g = $("#cGrade").value, rate = RATE[cMode][$("#cRate").value];
+  let html = "", note = "";
+  if (cMode === "stay") {
+    const fee = FEE[$("#cFac").value][g], days = v("#cDays");
+    const total = fee * days, mine = total * rate, nonpay = v("#cFood") * days + v("#cEtc");
+    html = `<div class="big"><small>한 달 예상 본인 부담</small><b>${W(mine + nonpay)}</b></div>
+      <table class="kv">
+        <tr><th>하루 수가</th><td>${W(fee)} × ${days}일 = ${W(total)}</td></tr>
+        <tr><th>공단이 내는 돈</th><td>${W(total - mine)}</td></tr>
+        <tr><th>본인부담 (급여)</th><td><b>${W(mine)}</b> <span class="muted">(${Math.round(rate * 100)}%)</span></td></tr>
+        <tr><th>비급여 (전액 본인)</th><td><b>${W(nonpay)}</b> <span class="muted">식재료비 ${W(v("#cFood") * days)} + 기타 ${W(v("#cEtc"))}</span></td></tr>
+      </table>`;
+    if (g === "3") note = "3~5등급은 원칙적으로 요양원 입소가 안 되고, 공단이 시설급여를 인정한 경우에만 들어갈 수 있어요.";
+    if (!v("#cFood")) note += (note ? " " : "") + "식재료비를 넣으면 더 정확해요. 기관 상세 화면의 '본인이 따로 내는 비용'을 참고하세요.";
+  } else {
+    const items = [];
+    if (g !== "c" && v("#cVisitN")) items.push(["방문요양", FEE.visit[$("#cVisitMin").value] * v("#cVisitN"), `${$("#cVisitMin").value}분 × ${v("#cVisitN")}회`]);
+    if (v("#cBathN")) items.push(["방문목욕", FEE.bath * v("#cBathN"), `${v("#cBathN")}회`]);
+    if (v("#cDayN")) items.push(["주야간보호", FEE.day[$("#cDayH").value][g] * v("#cDayN"), `${$("#cDayH").value} × ${v("#cDayN")}일`]);
+    if (v("#cShortN")) items.push(["단기보호", FEE.short[g === "c" ? 5 : g] * v("#cShortN"), `${v("#cShortN")}일`]);
+    const total = items.reduce((a, [, x]) => a + x, 0), lim = LIMIT[g];
+    const inLim = Math.min(total, lim), over = total - inLim;
+    const mine = inLim * rate + over, nonpay = v("#cMeal") * v("#cDayN") + v("#cEtc2");
+    html = `<div class="big"><small>한 달 예상 본인 부담</small><b>${W(mine + nonpay)}</b></div>
+      <table class="kv">
+        ${items.map(([n, x, d]) => `<tr><th>${n}</th><td>${W(x)} <span class="muted">(${d})</span></td></tr>`).join("") || `<tr><td colspan="2" class="muted">이용할 서비스 횟수나 일수를 넣어 주세요.</td></tr>`}
+        <tr><th>합계 / 월 한도</th><td>${W(total)} / ${W(lim)} ${total ? `<span class="muted">(한도의 ${Math.round((total / lim) * 100)}%)</span>` : ""}</td></tr>
+        <tr><th>본인부담 (한도 안)</th><td>${W(inLim * rate)} <span class="muted">(${Math.round(rate * 100)}%)</span></td></tr>
+        ${over ? `<tr><th>한도 넘은 금액</th><td><b class="bad">${W(over)}</b> <span class="muted">전액 본인부담</span></td></tr>` : ""}
+        <tr><th>비급여</th><td>${W(nonpay)}</td></tr>
+      </table>`;
+    if (g === "c") note = "인지지원등급은 방문요양을 이용할 수 없어요.";
+    if (over) note += (note ? " " : "") + "월 한도를 넘었어요. 넘은 금액은 전부 본인이 내야 해요.";
+    if (v("#cDayN") >= 15) note += (note ? " " : "") + "주야간보호를 많이 이용하면 월 한도가 일부 늘어날 수 있어요(공단에 확인).";
+  }
+  $("#cOut").innerHTML = html;
+  $("#cNote").textContent = note + " 실제 금액은 기관과 공단 내역서를 기준으로 하세요.";
+}
+$("#cMode").addEventListener("click", (e) => {
+  const m = e.target.dataset?.m; if (!m) return;
+  cMode = m;
+  document.querySelectorAll("#cMode .chip").forEach((b) => b.setAttribute("aria-pressed", b.dataset.m === m));
+  $("#cStay").hidden = $("#cStayType").hidden = m !== "stay"; $("#cHome").hidden = m !== "home";
+  fillGrades(); calc();
+});
+$("#cVisitMin").innerHTML = Object.keys(FEE.visit).map((k) => `<option value="${k}" ${k === "180" ? "selected" : ""}>${k}분</option>`).join("");
+$("#cDayH").innerHTML = Object.keys(FEE.day).map((k) => `<option ${k === "8~10시간" ? "selected" : ""}>${k}</option>`).join("");
+document.querySelector("#calc").addEventListener("input", calc);
+fillGrades(); calc();
+
+// 기관 상세 → 계산기 (입소형이면 식재료비를 넣어 줌)
+function toCalc(r) {
+  const stay = r.kind === "home";
+  $(`#cMode [data-m="${stay ? "stay" : "home"}"]`).click();
+  if (stay) {
+    if (r.sub_nm === "공동생활가정") $("#cFac").value = "group";
+    const f = (r.nonpay || []).find((x) => x.종류 === "식재료비");
+    $("#cFood").value = f && f.금액 && f.금액 <= 30000 ? f.금액 : "";
+  } else if (r.kind === "daycare") { $("#cDayN").value = 20; }
+  calc(); dlg.close(); go("calc");
+}
+
+// ---------- 화면 전환 (찾기 · 이용 안내 · 비용 계산) ----------
+function go(page) {
+  for (const p of ["find", "guide", "calc"]) { $("#" + p).hidden = p !== page; }
+  document.querySelectorAll("#nav button").forEach((b) => b.setAttribute("aria-current", b.dataset.p === page ? "page" : "false"));
+  $("#tray").style.display = page === "find" ? "" : "none";
+  if (location.hash !== "#" + page) history.replaceState(null, "", (page === "find" ? location.search || location.pathname : "#" + page));
+  window.scrollTo({ top: 0 });
+}
+$("#nav").addEventListener("click", (e) => { const p = e.target.dataset?.p; if (p) go(p); });
+if (["#guide", "#calc"].includes(location.hash)) go(location.hash.slice(1));
 
 // ---------- 시작 ----------
 (async function init() {
