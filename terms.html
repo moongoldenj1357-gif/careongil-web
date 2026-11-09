@@ -14,7 +14,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Ap
 a{color:var(--main)}
 header{background:var(--main);color:#fff;padding:18px 0}
 .wrap{max-width:820px;margin:0 auto;padding:0 16px}
-.logo{font-size:1.3rem;font-weight:800;color:#fff;text-decoration:none}.logo span{color:#f3c99a}
+.logo{font-size:1.3rem;font-weight:800;color:#fff;text-decoration:none}.logo .lt{font-weight:inherit}.logo span{color:#f3c99a}
+.logo{display:inline-flex;align-items:center;gap:8px}.logo .mark{width:28px;height:28px}
 main{background:var(--card);border-radius:14px;margin:20px auto 40px;padding:24px 22px;box-shadow:0 6px 24px rgba(31,42,36,.06)}
 h1{font-size:1.4rem;margin:0 0 6px}h2{font-size:1.08rem;margin:28px 0 8px;color:var(--main)}
 .muted{color:var(--sub);font-size:.9rem}
@@ -25,7 +26,7 @@ footer{color:var(--sub);font-size:.82rem;padding:0 0 40px}
 </style>
 </head>
 <body>
-<header><div class="wrap"><a class="logo" href="/">케어<span>온</span>길</a></div></header>
+<header><div class="wrap"><a class="logo" href="/"><svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="40" r="17" fill="#f5a35c"/><path d="M14 52 C 14 72, 30 84, 50 84 C 70 84, 86 72, 86 52" fill="none" stroke="#f3e2c7" stroke-width="14" stroke-linecap="round"/></svg><b class="lt">케어<span>온</span>길</b></a></div></header>
 <div class="wrap">
 <main>
 <h1>이용약관</h1>
