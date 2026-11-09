@@ -138,6 +138,7 @@ footer p{margin:4px 0}
   .row.three>div:last-child{grid-column:1/-1}
   .nums{grid-template-columns:repeat(2,1fr)}
 }
+.btn.kshare{background:#FEE500;border-color:#FEE500;color:#191919}
 .callbox{border:1px solid var(--line,#e5e0d8);border-radius:12px;padding:12px 14px;margin-top:14px}
 .callbox h4{margin:0 0 6px;font-size:1rem}.callbox ol{margin:6px 0;padding-left:20px}.callbox li{margin:3px 0}
 .callbox .sub{font-weight:700;margin:10px 0 2px;font-size:.92rem}
@@ -531,6 +532,39 @@ function callHtml(r) {
       <button class="btn" type="button" id="copyCall" data-text="${esc(text)}">📋 체크리스트 복사</button></div>
     <p class="muted" style="margin:8px 0 0;font-size:.85rem">복사해 두시면 메모장에 붙여 넣고 통화 내용을 적으실 수 있습니다. 케어온길은 통화 내용을 저장하지 않습니다.</p></div>`;
 }
+// ---------- 카카오톡 공유 ----------
+let shareReady = null;
+function loadShare() {
+  if (shareReady) return shareReady;
+  shareReady = fetch("/api/config").then((r) => r.json()).then((c) => new Promise((ok, no) => {
+    const key = c.kakaoShareKey || c.kakaoJsKey;
+    if (!key) return no(new Error("no key"));
+    if (window.Kakao && window.Kakao.Share) { if (!Kakao.isInitialized()) Kakao.init(key); return ok(window.Kakao); }
+    const s = document.createElement("script");
+    s.src = "https://t1.kakaocdn.net/kakao_js_sdk/2.8.1/kakao.min.js";
+    s.onload = () => { try { if (!Kakao.isInitialized()) Kakao.init(key); ok(window.Kakao); } catch (e) { no(e); } };
+    s.onerror = () => no(new Error("sdk"));
+    document.head.appendChild(s);
+  }));
+  shareReady.catch(() => { shareReady = null; });
+  return shareReady;
+}
+async function shareInst(r, btn) {
+  const url = location.origin + "/?inst=" + encodeURIComponent(r.id);
+  const desc = [r.kind_nm, r.addr ? cleanAddr(r.addr).split(" ").slice(0, 3).join(" ") : "", r.eval_grade ? `기관평가 ${r.eval_grade}등급` : ""].filter(Boolean).join(" · ");
+  try {
+    const K = await loadShare();
+    K.Share.sendDefault({
+      objectType: "feed",
+      content: { title: r.name, description: desc || "케어온길에서 찾은 장기요양기관입니다", imageUrl: location.origin + "/og.png", link: { mobileWebUrl: url, webUrl: url } },
+      buttons: [{ title: "케어온길에서 보기", link: { mobileWebUrl: url, webUrl: url } }],
+    });
+  } catch {
+    // 카카오 공유가 안 될 때: 휴대폰 공유 창 → 그것도 안 되면 링크 복사
+    try { if (navigator.share) { await navigator.share({ title: r.name, text: desc, url }); return; } } catch { return; }
+    try { await navigator.clipboard.writeText(url); btn.textContent = "✓ 링크를 복사했습니다"; } catch { prompt("아래 링크를 복사해 주세요", url); }
+  }
+}
 async function openDetail(id) {
   show("불러오는 중…", "");
   try {
@@ -558,10 +592,12 @@ async function openDetail(id) {
       ${callHtml(r)}
       <div class="acts"><button class="btn ${picked ? "on" : ""}" type="button" data-pick="${r.id}">${picked ? "✓ 비교에 담음" : "+ 비교 담기"}</button>
         ${["home", "daycare", "short"].includes(r.kind) ? `<button class="btn pri" type="button" id="toCalc">이 기관 비용 계산</button>` : ""}
-        <button class="btn" type="button" id="askAi">💬 이 기관 AI에게 묻기</button></div>
+        <button class="btn" type="button" id="askAi">💬 이 기관 AI에게 묻기</button>
+        <button class="btn kshare" type="button" id="shareKakao">카카오톡으로 공유</button></div>
       <p class="note">빈자리는 정원에서 현원을 뺀 추정값입니다. 실제 입소 가능 여부와 비용은 기관에 전화로 확인해 보시길 권해 드립니다.</p>`);
     const tc = $("#toCalc"); if (tc) tc.onclick = () => toCalc(r);
     $("#askAi").onclick = () => openChat([r]);
+    $("#shareKakao").onclick = (e) => shareInst(r, e.currentTarget);
     const cc = $("#copyCall");
     if (cc) cc.onclick = async () => {
       try { await navigator.clipboard.writeText(cc.dataset.text); cc.textContent = "✓ 복사했습니다"; }
@@ -917,6 +953,7 @@ $("#chatForm").addEventListener("submit", async (e) => {
     $("#sido").innerHTML = `<option value="">시·도 선택</option>` + regions.map((s) => `<option value="${s.cd}">${esc(s.nm)}</option>`).join("");
     $("#sido").value = state.sido; drawSgg(); $("#sgg").value = state.sgg;
     if (state.sido || state.q) search(false);
+    if (u.get("inst")) openDetail(u.get("inst"));
   } catch (e) { $("#sido").innerHTML = `<option value="">지역을 불러오지 못했습니다</option>`; }
 })();
 </script>
