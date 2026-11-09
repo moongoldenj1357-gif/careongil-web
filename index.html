@@ -99,6 +99,8 @@ table.kv th{width:30%;color:var(--sub);font-weight:500;white-space:nowrap}
 .cmp th,.cmp td{border-bottom:1px solid var(--line);padding:9px 8px;text-align:left;vertical-align:top;min-width:150px}
 .cmp th:first-child{position:sticky;left:0;background:#fff;min-width:80px;color:var(--sub);font-weight:500}
 .note{background:var(--warm-soft);border-radius:10px;padding:10px 12px;font-size:.88rem;margin-top:14px}
+.gbtn{border:0;cursor:pointer;font:inherit;font-size:.78rem;font-weight:600}.gbtn:hover{filter:brightness(.95)}
+tr.hl td{background:#fff7e6;font-weight:600}
 .b.g{background:#eef0f3;color:#46505a}.b.gA{background:#2f6b4f;color:#fff}.b.gB{background:#d8eadf;color:#245a40}.b.gD{background:#f6e7d6;color:#8a5520}.b.gE{background:#f5dcd7;color:#a33b2b}
 h4.sec{margin:20px 0 6px;font-size:1rem;color:var(--main)}
 ul.pg{margin:0;padding-left:18px}ul.pg li{margin:3px 0}
@@ -372,7 +374,17 @@ function toUrl() {
 }
 
 // ---------- 목록 ----------
-const gradeBadge = (r) => (r.eval_grade ? `<span class="b g g${r.eval_grade}" title="국민건강보험공단 ${r.eval_year}년 기관 평가">기관평가 ${r.eval_grade} <small>(${r.eval_year})</small></span>` : "");
+const gradeBadge = (r) => (r.eval_grade ? `<button type="button" class="b g g${r.eval_grade} gbtn" data-grade="${r.eval_grade}" data-gy="${r.eval_year}" aria-label="기관평가 ${r.eval_grade}등급 설명 보기">기관평가 ${r.eval_grade} <small>(${r.eval_year})</small> ⓘ</button>` : "");
+const GRADE_RULE = { A: "총점 90점 이상이면서 영역별 점수가 모두 70점 이상", B: "총점 80점 이상이면서 영역별 점수가 모두 60점 이상", C: "총점 70점 이상이면서 영역별 점수가 모두 50점 이상", D: "총점 60점 이상이면서 영역별 점수가 모두 40점 이상", E: "D등급 기준에 미치지 못함" };
+function gradeInfo(g, y) {
+  const all = ["A", "B", "C", "D", "E"].map((k) => `<tr${k === g ? ' class="hl"' : ""}><td><span class="b g g${k}">${k}</span> ${GRADE_NM[k]}</td><td>${GRADE_RULE[k]}</td></tr>`).join("");
+  show(g ? `기관평가 ${g} · ${GRADE_NM[g]}` : "기관평가란?", `
+    ${g ? `<p>이 기관은 국민건강보험공단의 <b>${y}년 평가</b>에서 <b>${g}등급(${GRADE_NM[g]})</b>을 받았습니다. ${GRADE_RULE[g]}인 경우에 받는 등급입니다.</p>` : ""}
+    <p class="muted">국민건강보험공단이 3년마다 서비스 종류별로 기관을 방문해 평가하는 절대평가입니다. 어르신의 장기요양등급(1~5등급)과는 다릅니다.</p>
+    <div class="cmp"><table class="tbl"><tr><th>등급</th><th>기준</th></tr>${all}</table></div>
+    <p class="muted">행정처분을 받은 기관은 한 단계 낮추고, 노인학대로 처분을 받으면 최하위로 조정합니다. 등급은 고르실 때 참고로 보시고, 직접 방문해 보시길 권해 드립니다.</p>
+    <div class="acts"><button class="btn" type="button" onclick="dlg.close();go('guide');setTimeout(()=>document.getElementById('guide-eval').scrollIntoView(),50)">자세한 설명 · 등급이 없는 이유</button></div>`);
+}
 const GRADE_NM = { A: "최우수", B: "우수", C: "양호", D: "보통", E: "미흡" };
 const regionName = (r) => {
   const s = regions.find((x) => x.cd === r.sido_cd);
@@ -424,6 +436,7 @@ async function search(scroll) {
   }
 }
 document.addEventListener("click", (e) => {
+  const gb = e.target.closest("[data-grade]"); if (gb) { gradeInfo(gb.dataset.grade, gb.dataset.gy); return; }
   const t = e.target.closest("[data-detail],[data-pick],[data-page]"); if (!t) return;
   if (t.dataset.page) { state.page = Number(t.dataset.page); search(true); }
   if (t.dataset.detail) openDetail(t.dataset.detail);
@@ -456,7 +469,7 @@ function evalHtml(r) {
   const now = ev[0];
   const areas = Object.entries(now.areas || {}).map(([k, v]) => `${esc(k)} <b>${v}</b>`).join(" · ");
   return `<h4 class="sec">기관평가 (국민건강보험공단)</h4>
-    <p><span class="b g g${now.grade}" style="font-size:.95rem">${now.grade} · ${GRADE_NM[now.grade] || ""}</span>
+    <p><button type="button" class="b g g${now.grade} gbtn" data-grade="${now.grade}" data-gy="${String(now.eval_date || "").slice(0, 4)}" style="font-size:.95rem">${now.grade} · ${GRADE_NM[now.grade] || ""} ⓘ</button>
       <span class="muted">${esc(now.round)} · ${now.score}점 · ${esc(now.eval_date)}</span></p>
     ${areas ? `<p class="muted">영역별 점수(100점 만점): ${areas}</p>` : ""}
     ${ev.length > 1 ? `<p class="muted">지난 평가: ${ev.slice(1).map((x) => `${esc(x.round)} <b>${x.grade}</b>`).join(" · ")}</p>` : ""}
@@ -528,7 +541,7 @@ $("#trayGo").addEventListener("click", async () => {
     show(`${rows.length}곳 비교`, `<div class="cmp"><table>
       ${line("이름", (r) => `<b>${esc(r.name)}</b>`)}
       ${line("종류", (r) => esc(r.kind_nm + (r.sub_nm ? ` (${r.sub_nm})` : "")))}
-      ${line("기관평가", (r) => (r.eval_grade ? `<b>${r.eval_grade}</b> ${GRADE_NM[r.eval_grade]} <span class="muted">(${r.eval_year})</span>` : `<span class="muted">결과 없음</span>`))}
+      ${line(`기관평가 <button type="button" class="lnk" data-grade="">ⓘ</button>`, (r) => (r.eval_grade ? `<b>${r.eval_grade}</b> ${GRADE_NM[r.eval_grade]} <span class="muted">(${r.eval_year})</span>` : `<span class="muted">결과 없음</span>`))}
       ${line("치매전담실", (r) => (r.dementia_units ? `${r.dementia_units}실` : "–"))}
       ${line("주소", (r) => esc(r.addr || "준비 중"))}
       ${line("전화", (r) => (r.tel ? `<a href="tel:${esc(r.tel)}">${esc(r.tel)}</a>` : "–"))}
