@@ -521,7 +521,7 @@ function callHtml(r) {
     ...(day ? ["차량 송영이 되는 지역과 시간"] : []),
     "방문 상담이나 견학이 가능한 시간",
   ] : ["서비스 가능 지역과 시간대", "요양보호사 배정과 교체 방법", "한 달 본인부담금 예상액", "처음 시작까지 걸리는 기간"];
-  const waitTxt = stay && r.wait != null ? `<p class="muted" style="margin:0 0 4px">공단 자료 기준 대기 ${num(r.wait)}명입니다. 실제 대기 상황은 기관에 확인해 주시길 바랍니다.</p>` : "";
+  const waitTxt = stay && r.wait != null ? `<p class="muted" style="margin:0 0 4px">${Number(r.wait) === 0 ? "공단 자료상 대기자는 없지만 실제와 다를 수 있습니다." : `공단 자료 기준 대기 ${num(r.wait)}명입니다. 실제와 다를 수 있습니다.`} 기관에 확인해 주시길 바랍니다.</p>` : "";
   const text = `[${r.name} ${what}]\n전화: ${r.tel}\n\n말씀드릴 것\n${say.map((x, i) => `${i + 1}. ${x}`).join("\n")}\n\n여쭤볼 것\n${ask.map((x, i) => `${i + 1}. ${x}`).join("\n")}`;
   return `<div class="callbox"><h4>📞 ${what}</h4>${waitTxt}
     <p style="margin:0">통화하시기 전에 아래 내용을 한 번 읽어 보시면 도움이 됩니다.</p>
