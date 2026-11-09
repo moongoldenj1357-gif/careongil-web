@@ -138,6 +138,12 @@ footer p{margin:4px 0}
   .row.three>div:last-child{grid-column:1/-1}
   .nums{grid-template-columns:repeat(2,1fr)}
 }
+.card[data-detail]{cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.card[data-detail]:hover{border-color:var(--main);box-shadow:0 4px 14px rgba(47,107,79,.12)}
+.btn.more{font-weight:700}
+.btn.more.hint{animation:hint 1.1s ease-in-out 2}
+@keyframes hint{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(47,107,79,.45)}50%{transform:scale(1.06);box-shadow:0 0 0 8px rgba(47,107,79,0)}}
+@media (prefers-reduced-motion:reduce){.btn.more.hint{animation:none}}
 .btn.kshare{background:#FEE500;border-color:#FEE500;color:#191919}
 .callbox{border:1px solid var(--line,#e5e0d8);border-radius:12px;padding:12px 14px;margin-top:14px}
 .callbox h4{margin:0 0 6px;font-size:1rem}.callbox ol{margin:6px 0;padding-left:20px}.callbox li{margin:3px 0}
@@ -413,15 +419,15 @@ function card(r) {
       <div><b>${num(r.now)}</b><small>현원</small></div>
       <div class="vac"><b>${num(r.vacancy)}</b><small>빈자리(추정)</small></div>
       <div><b>${num(r.wait)}</b><small>대기</small></div></div>` : "";
-  return `<article class="card">
+  return `<article class="card" data-detail="${r.id}">
     <div class="badges"><span class="b">${esc(r.kind_nm)}</span>${r.sub_nm ? `<span class="b w">${esc(r.sub_nm)}</span>` : ""}${r.dementia_units ? `<span class="b w">치매전담실 ${r.dementia_units}실</span>` : ""}${gradeBadge(r)}</div>
     <h3>${esc(r.name)}</h3>
     <p class="addr">${r.addr ? esc(r.addr) : esc(regionName(r)) + ' <span class="muted">· 상세 정보 준비 중</span>'}</p>
     ${nums}
     <p class="muted">장기요양기관 지정일 ${day(r.designated)}</p>
     <div class="acts">
+      <button class="btn pri more" type="button" data-detail="${r.id}">자세히 보기 ›</button>
       ${r.tel ? `<a class="btn" href="tel:${esc(r.tel)}">📞 ${esc(r.tel)}</a>` : ""}
-      <button class="btn" type="button" data-detail="${r.id}">자세히</button>
       <button class="btn ${picked ? "on" : ""}" type="button" data-pick="${r.id}">${picked ? "✓ 비교에 담음" : "+ 비교 담기"}</button>
     </div></article>`;
 }
@@ -440,6 +446,7 @@ async function search(scroll) {
     $("#count").textContent = `${num(j.total)}곳`;
     $("#hint").textContent = j.total ? `${j.page} / ${j.pages}쪽` : "";
     $("#list").innerHTML = j.rows.length ? j.rows.map(card).join("") : `<div class="empty">조건에 맞는 기관이 없습니다. 종류나 지역을 넓혀서 찾아보실 수 있습니다.</div>`;
+    if (!window._hinted) { const m = $("#list .btn.more"); if (m) { m.classList.add("hint"); window._hinted = true; } }
     if (j.pages > 1) $("#pager").innerHTML =
       `<button class="btn" type="button" data-page="${j.page - 1}" ${j.page <= 1 ? "disabled" : ""}>‹ 이전</button>
        <span class="muted">${j.page} / ${j.pages}</span>
@@ -453,7 +460,8 @@ async function search(scroll) {
 }
 document.addEventListener("click", (e) => {
   const gb = e.target.closest("[data-grade]"); if (gb) { gradeInfo(gb.dataset.grade, gb.dataset.gy); return; }
-  const t = e.target.closest("[data-detail],[data-pick],[data-page]"); if (!t) return;
+  if (e.target.closest("a[href]")) return;   // 전화·지도 링크는 그대로 동작
+  const t = e.target.closest("[data-pick],[data-page],[data-detail]"); if (!t) return;
   if (t.dataset.page) { state.page = Number(t.dataset.page); search(true); }
   if (t.dataset.detail) openDetail(t.dataset.detail);
   if (t.dataset.pick) {
@@ -807,7 +815,7 @@ async function drawBigMap(rows) {
       const pos = new k.maps.LatLng(p.lat, p.lng); bounds.extend(pos); n++;
       const mk = new k.maps.Marker({ map: bigMap, position: pos, title: r.name }); bigMarkers.push(mk);
       const ov = new k.maps.CustomOverlay({ position: pos, yAnchor: 1.6, content:
-        `<div class="mbub"><b>${esc(r.name)}</b>${r.eval_grade ? ` <span class="b g g${r.eval_grade}">기관평가 ${r.eval_grade}</span>` : ""}<br><span class="muted">${esc(r.kind_nm)}${r.capacity != null ? ` · 정원 ${r.capacity}` : ""}</span><br><button class="btn" type="button" data-detail="${r.id}">자세히</button></div>` });
+        `<div class="mbub"><b>${esc(r.name)}</b>${r.eval_grade ? ` <span class="b g g${r.eval_grade}">기관평가 ${r.eval_grade}</span>` : ""}<br><span class="muted">${esc(r.kind_nm)}${r.capacity != null ? ` · 정원 ${r.capacity}` : ""}</span><br><button class="btn pri" type="button" data-detail="${r.id}">자세히 보기 ›</button></div>` });
       k.maps.event.addListener(mk, "click", () => { if (open) open.setMap(null); ov.setMap(bigMap); open = ov; });
     }
     if (myPos) { const me = new k.maps.LatLng(myPos.lat, myPos.lng); bounds.extend(me);
