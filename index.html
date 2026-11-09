@@ -556,7 +556,7 @@ async function shareInst(r, btn) {
     const K = await loadShare();
     K.Share.sendDefault({
       objectType: "feed",
-      content: { title: r.name, description: desc || "케어온길에서 찾은 장기요양기관입니다", imageUrl: location.origin + "/og.png", link: { mobileWebUrl: url, webUrl: url } },
+      content: { title: r.name, description: desc || "케어온길에서 찾은 장기요양기관입니다", imageUrl: location.origin + "/og.png", imageWidth: 1200, imageHeight: 630, link: { mobileWebUrl: url, webUrl: url } },
       buttons: [{ title: "케어온길에서 보기", link: { mobileWebUrl: url, webUrl: url } }],
     });
   } catch {
