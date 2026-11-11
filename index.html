@@ -189,6 +189,7 @@ footer p{margin:4px 0}
   <div id="mapBox" hidden></div>
   <div class="list" id="list"></div>
   <div class="pager" id="pager"></div>
+  <p class="muted" id="bizHint" hidden style="font-size:.88rem;margin-top:18px">이 지역에서 기관 운영이나 창업을 고민 중이신가요? <a id="bizLink" href="/biz">지역 요약 보기 ›</a></p>
 </main>
 <section class="wrap page" id="fav" hidden>
   <div class="meta"><h2>☆ 관심 기관</h2><span class="muted">부모님이 계신 기관이나 눈여겨본 기관을 모아 두고 바로 여실 수 있습니다</span></div>
@@ -344,6 +345,7 @@ footer p{margin:4px 0}
 
 <footer><div class="wrap">
   <p>자료: 국민건강보험공단 장기요양기관 정보(공공데이터포털). 정원·현원·대기 인원은 공단에 신고된 값이라 실제와 다를 수 있으니 기관에 전화로 확인해 보시길 권해 드립니다.</p>
+  <p><a href="/biz">기관 운영·창업 정보 (케어온길 비즈)</a></p>
   <p><a href="/privacy.html"><b>개인정보처리방침</b></a> · <a href="/terms.html">이용약관</a> · <a href="/location.html">위치기반서비스 이용약관</a> · <a href="#" id="locWithdraw">위치 이용 동의 철회</a></p>
   <p>유튜브 <a href="https://www.youtube.com/@careongil" target="_blank" rel="noopener"><b>케어온길 TV</b></a>에서 요양시설 고르는 법을 영상으로 보실 수 있습니다.</p>
   <p>케어온길은 기관 정보를 모아 보여 주는 서비스이며 장기요양등급 판정, 의료 판단, 입소 확정을 대신하지 않습니다.</p>
@@ -457,6 +459,8 @@ async function search(scroll) {
     $("#count").textContent = `${num(j.total)}곳`;
     $("#hint").textContent = j.total ? `${j.page} / ${j.pages}쪽` : "";
     j.rows.forEach((r) => rowCache.set(r.id, r));
+    if (state.sido) { const bk = state.kinds.find((k) => ["daycare","home","short","visit_care","visit_bath","visit_nurse"].includes(k)) || "daycare";
+      $("#bizLink").href = "/biz?" + new URLSearchParams({ sido: state.sido, ...(state.sgg ? { sgg: state.sgg } : {}), kind: bk }); $("#bizHint").hidden = false; }
     $("#list").innerHTML = j.rows.length ? j.rows.map(card).join("") : `<div class="empty">조건에 맞는 기관이 없습니다. 종류나 지역을 넓혀서 찾아보실 수 있습니다.</div>`;
     if (!window._hinted) { const m = $("#list .btn.more"); if (m) { m.classList.add("hint"); window._hinted = true; } }
     if (j.pages > 1) $("#pager").innerHTML =
