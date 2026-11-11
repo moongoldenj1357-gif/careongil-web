@@ -144,6 +144,8 @@ footer p{margin:4px 0}
 .btn.more.hint{animation:hint 1.1s ease-in-out 2}
 @keyframes hint{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(47,107,79,.45)}50%{transform:scale(1.06);box-shadow:0 0 0 8px rgba(47,107,79,0)}}
 @media (prefers-reduced-motion:reduce){.btn.more.hint{animation:none}}
+.btn.fav-on{background:#fff7e0;border-color:#e8b923;color:#8a6200;font-weight:700}
+#nav button b{margin-left:3px}
 .btn.kshare{background:#FEE500;border-color:#FEE500;color:#191919}
 #nav a.yt{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:7px 14px;background:rgba(255,255,255,.14);color:#fff;text-decoration:none}
 #nav a.yt svg{width:18px;height:18px;color:#ff4e45}
@@ -157,7 +159,7 @@ footer p{margin:4px 0}
   <div class="wrap">
     <p class="logo"><svg class="mark" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="40" r="17" fill="#f5a35c"/><path d="M14 52 C 14 72, 30 84, 50 84 C 70 84, 86 72, 86 52" fill="none" stroke="#f3e2c7" stroke-width="14" stroke-linecap="round"/></svg><b class="lt">케어<span>온</span>길</b></p>
     <p class="tag">부모님 돌봄, 가까운 장기요양기관을 쉽게 찾고 비교해 보실 수 있습니다</p>
-    <nav id="nav"><button type="button" data-p="find" aria-current="page">기관 찾기</button><button type="button" data-p="guide">이용 안내 · 등급</button><button type="button" data-p="calc">비용 계산기</button><a class="yt" href="https://www.youtube.com/@careongil" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z"/></svg>케어온길 TV</a></nav>
+    <nav id="nav"><button type="button" data-p="find" aria-current="page">기관 찾기</button><button type="button" data-p="guide">이용 안내 · 등급</button><button type="button" data-p="calc">비용 계산기</button><button type="button" data-p="fav">☆ 관심 기관<b id="favN"></b></button><a class="yt" href="https://www.youtube.com/@careongil" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 6.2 31 31 0 0 0 0 12a31 31 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.5 9.4.5 9.4.5s7.5 0 9.4-.5a3 3 0 0 0 2.1-2.1A31 31 0 0 0 24 12a31 31 0 0 0-.5-5.8zM9.6 15.6V8.4l6.3 3.6-6.3 3.6z"/></svg>케어온길 TV</a></nav>
   </div>
 </header>
 
@@ -188,6 +190,11 @@ footer p{margin:4px 0}
   <div class="list" id="list"></div>
   <div class="pager" id="pager"></div>
 </main>
+<section class="wrap page" id="fav" hidden>
+  <div class="meta"><h2>☆ 관심 기관</h2><span class="muted">부모님이 계신 기관이나 눈여겨본 기관을 모아 두고 바로 여실 수 있습니다</span></div>
+  <div class="list" id="favList"></div>
+  <p class="note">관심 기관은 지금 쓰시는 이 휴대폰(브라우저)에만 저장되며, 케어온길 서버에는 보내지 않습니다. 브라우저 기록을 지우시면 함께 지워질 수 있습니다. 2곳 이상 <b>비교 담기</b>를 하시면 비교표를 만들어 가족분들께 카카오톡으로 보내실 수 있습니다.</p>
+</section>
 <section class="wrap page" id="guide" hidden>
   <div class="panel">
     <h2>처음이신가요? 5단계로 보는 장기요양 이용</h2>
@@ -432,6 +439,7 @@ function card(r) {
       <button class="btn pri more" type="button" data-detail="${r.id}">자세히 보기 ›</button>
       ${r.tel ? `<a class="btn" href="tel:${esc(r.tel)}">📞 ${esc(r.tel)}</a>` : ""}
       <button class="btn ${picked ? "on" : ""}" type="button" data-pick="${r.id}">${picked ? "✓ 비교에 담음" : "+ 비교 담기"}</button>
+      <button class="btn ${isFav(r.id) ? "fav-on" : ""}" type="button" data-fav="${r.id}">${favLabel(isFav(r.id))}</button>
     </div></article>`;
 }
 async function search(scroll) {
@@ -448,6 +456,7 @@ async function search(scroll) {
     lastRows = j.rows;
     $("#count").textContent = `${num(j.total)}곳`;
     $("#hint").textContent = j.total ? `${j.page} / ${j.pages}쪽` : "";
+    j.rows.forEach((r) => rowCache.set(r.id, r));
     $("#list").innerHTML = j.rows.length ? j.rows.map(card).join("") : `<div class="empty">조건에 맞는 기관이 없습니다. 종류나 지역을 넓혀서 찾아보실 수 있습니다.</div>`;
     if (!window._hinted) { const m = $("#list .btn.more"); if (m) { m.classList.add("hint"); window._hinted = true; } }
     if (j.pages > 1) $("#pager").innerHTML =
@@ -464,6 +473,7 @@ async function search(scroll) {
 document.addEventListener("click", (e) => {
   const gb = e.target.closest("[data-grade]"); if (gb) { gradeInfo(gb.dataset.grade, gb.dataset.gy); return; }
   if (e.target.closest("a[href]")) return;   // 전화·지도 링크는 그대로 동작
+  const fb = e.target.closest("[data-fav]"); if (fb) { toggleFav(fb.dataset.fav); return; }
   const t = e.target.closest("[data-pick],[data-page],[data-detail]"); if (!t) return;
   if (t.dataset.page) { state.page = Number(t.dataset.page); search(true); }
   if (t.dataset.detail) openDetail(t.dataset.detail);
@@ -560,26 +570,65 @@ function loadShare() {
   shareReady.catch(() => { shareReady = null; });
   return shareReady;
 }
-async function shareInst(r, btn) {
-  const url = location.origin + "/?inst=" + encodeURIComponent(r.id);
-  const desc = [r.kind_nm, r.addr ? cleanAddr(r.addr).split(" ").slice(0, 3).join(" ") : "", r.eval_grade ? `기관평가 ${r.eval_grade}등급` : ""].filter(Boolean).join(" · ");
+async function shareLink({ title, desc, url, btnTitle }, btn) {
   try {
     const K = await loadShare();
     K.Share.sendDefault({
       objectType: "feed",
-      content: { title: r.name, description: desc || "케어온길에서 찾은 장기요양기관입니다", imageUrl: location.origin + "/og.png", imageWidth: 1200, imageHeight: 630, link: { mobileWebUrl: url, webUrl: url } },
-      buttons: [{ title: "케어온길에서 보기", link: { mobileWebUrl: url, webUrl: url } }],
+      content: { title, description: desc || "케어온길에서 찾은 장기요양기관입니다", imageUrl: location.origin + "/og.png", imageWidth: 1200, imageHeight: 630, link: { mobileWebUrl: url, webUrl: url } },
+      buttons: [{ title: btnTitle || "케어온길에서 보기", link: { mobileWebUrl: url, webUrl: url } }],
     });
   } catch {
     // 카카오 공유가 안 될 때: 휴대폰 공유 창 → 그것도 안 되면 링크 복사
-    try { if (navigator.share) { await navigator.share({ title: r.name, text: desc, url }); return; } } catch { return; }
-    try { await navigator.clipboard.writeText(url); btn.textContent = "✓ 링크를 복사했습니다"; } catch { prompt("아래 링크를 복사해 주세요", url); }
+    try { if (navigator.share) { await navigator.share({ title, text: desc, url }); return; } } catch { return; }
+    try { await navigator.clipboard.writeText(url); if (btn) btn.textContent = "✓ 링크를 복사했습니다"; } catch { prompt("아래 링크를 복사해 주세요", url); }
   }
 }
+function shareInst(r, btn) {
+  const desc = [r.kind_nm, r.addr ? cleanAddr(r.addr).split(" ").slice(0, 3).join(" ") : "", r.eval_grade ? `기관평가 ${r.eval_grade}등급` : ""].filter(Boolean).join(" · ");
+  return shareLink({ title: r.name, desc, url: location.origin + "/?inst=" + encodeURIComponent(r.id) }, btn);
+}
+function shareCompare(rows, btn) {
+  const names = rows.map((r) => r.name + (r.eval_grade ? `(${r.eval_grade})` : "")).join(" · ");
+  return shareLink({ title: `요양기관 ${rows.length}곳 비교표`, desc: names.length > 90 ? names.slice(0, 88) + "…" : names,
+    url: location.origin + "/?cmp=" + rows.map((r) => encodeURIComponent(r.id)).join(","), btnTitle: "비교표 보기" }, btn);
+}
+
+// ---------- 관심 기관 (이 휴대폰·브라우저에만 저장) ----------
+const rowCache = new Map();
+let favs = [];
+try { favs = JSON.parse(localStorage.getItem("cog_favs") || "[]"); if (!Array.isArray(favs)) favs = []; } catch { favs = []; }
+const isFav = (id) => favs.some((f) => f.id === id);
+const favLabel = (on) => (on ? "★ 관심 기관" : "☆ 관심 저장");
+function saveFavs() { try { localStorage.setItem("cog_favs", JSON.stringify(favs)); } catch {} $("#favN").textContent = favs.length ? ` ${favs.length}` : ""; }
+function toggleFav(id) {
+  if (isFav(id)) favs = favs.filter((f) => f.id !== id);
+  else {
+    const r = rowCache.get(id); if (!r) return;
+    if (favs.length >= 50) { alertBox("관심 기관은 50곳까지 저장하실 수 있습니다."); return; }
+    favs.unshift({ id: r.id, name: r.name, kind: r.kind, kind_nm: r.kind_nm, sub_nm: r.sub_nm || "", addr: r.addr || "", tel: r.tel || "", eval_grade: r.eval_grade || "", eval_year: r.eval_year || "", at: new Date().toISOString().slice(0, 10) });
+  }
+  saveFavs();
+  document.querySelectorAll(`[data-fav="${id}"]`).forEach((b) => { const on = isFav(id); b.classList.toggle("fav-on", on); b.textContent = favLabel(on); });
+  if (!$("#fav").hidden) drawFavs();
+}
+function drawFavs() {
+  $("#favList").innerHTML = favs.length ? favs.map((f) => `<article class="card" data-detail="${esc(f.id)}">
+    <div class="badges"><span class="b">${esc(f.kind_nm)}</span>${f.sub_nm ? `<span class="b w">${esc(f.sub_nm)}</span>` : ""}${gradeBadge(f)}</div>
+    <h3>${esc(f.name)}</h3><p class="addr">${esc(f.addr || "")}</p>
+    <p class="muted">${esc(f.at)} 저장 · 기관평가는 저장할 때 기준이며, 자세히 보기에서 최신 정보를 보실 수 있습니다</p>
+    <div class="acts"><button class="btn pri more" type="button" data-detail="${esc(f.id)}">자세히 보기 ›</button>
+      ${f.tel ? `<a class="btn" href="tel:${esc(f.tel)}">📞 ${esc(f.tel)}</a>` : ""}
+      <button class="btn ${picks.includes(f.id) ? "on" : ""}" type="button" data-pick="${esc(f.id)}">${picks.includes(f.id) ? "✓ 비교에 담음" : "+ 비교 담기"}</button>
+      <button class="btn fav-on" type="button" data-fav="${esc(f.id)}">★ 관심 해제</button></div></article>`).join("")
+    : `<div class="empty">아직 저장한 기관이 없습니다. 기관 찾기에서 <b>☆ 관심 저장</b>을 누르시면 여기에 모아 두고 바로 여실 수 있습니다.</div>`;
+}
+
 async function openDetail(id) {
   show("불러오는 중…", "");
   try {
     const r = await api({ id });
+    rowCache.set(r.id, r);
     const rows = [
       ["종류", esc(r.kind_nm + (r.sub_nm ? ` (${r.sub_nm})` : "")) + (r.dementia_units ? ` · <b>치매전담실 ${r.dementia_units}실 운영</b>` : "")],
       ["주소", r.addr ? esc(r.addr + (r.addr_detail ? " " + r.addr_detail : "")) + (mapLink(r) ? ` <a href="${mapLink(r)}" target="_blank" rel="noopener">지도</a>` : "") : "상세 정보 준비 중"],
@@ -602,6 +651,7 @@ async function openDetail(id) {
       ${extraHtml(r)}
       ${callHtml(r)}
       <div class="acts"><button class="btn ${picked ? "on" : ""}" type="button" data-pick="${r.id}">${picked ? "✓ 비교에 담음" : "+ 비교 담기"}</button>
+        <button class="btn ${isFav(r.id) ? "fav-on" : ""}" type="button" data-fav="${r.id}">${favLabel(isFav(r.id))}</button>
         ${["home", "daycare", "short"].includes(r.kind) ? `<button class="btn pri" type="button" id="toCalc">이 기관 비용 계산</button>` : ""}
         <button class="btn" type="button" id="askAi">💬 이 기관 AI에게 묻기</button>
         <button class="btn kshare" type="button" id="shareKakao">카카오톡으로 공유</button></div>
@@ -652,7 +702,11 @@ $("#trayGo").addEventListener("click", async () => {
       ${line("홈페이지", (r) => homeLink(r.homepage))}
       ${line("", (r) => `<button class="btn" type="button" data-unpick="${r.id}">빼기</button>`)}
     </table></div><p class="note">공단에 신고된 값입니다. 비용·식단·프로그램·분위기는 방문 상담으로 확인해 보시길 권해 드립니다.</p>
-      <div class="acts"><button class="btn pri" type="button" id="askAiCmp">💬 이 기관들 AI에게 묻기</button></div>`, true);
+      <div class="acts"><button class="btn kshare" type="button" id="shareCmp">카카오톡으로 비교표 보내기</button>
+        <button class="btn pri" type="button" id="askAiCmp">💬 이 기관들 AI에게 묻기</button></div>
+      <p class="muted" style="font-size:.85rem">비교표를 보내시면 가족분들도 같은 비교표를 그대로 보실 수 있습니다.</p>`, true);
+    rows.forEach((r) => rowCache.set(r.id, r));
+    $("#shareCmp").onclick = (e) => shareCompare(rows, e.currentTarget);
     $("#askAiCmp").onclick = () => openChat(rows);
   } catch (e) { show("오류", `<p>${esc(e.message)}</p>`); }
 });
@@ -755,14 +809,16 @@ function toCalc(r) {
 
 // ---------- 화면 전환 (찾기 · 이용 안내 · 비용 계산) ----------
 function go(page) {
-  for (const p of ["find", "guide", "calc"]) { $("#" + p).hidden = p !== page; }
+  for (const p of ["find", "guide", "calc", "fav"]) { $("#" + p).hidden = p !== page; }
+  if (page === "fav") drawFavs();
   document.querySelectorAll("#nav button").forEach((b) => b.setAttribute("aria-current", b.dataset.p === page ? "page" : "false"));
-  $("#tray").style.display = page === "find" ? "" : "none";
+  $("#tray").style.display = page === "find" || page === "fav" ? "" : "none";
   if (location.hash !== "#" + page) history.replaceState(null, "", (page === "find" ? location.search || location.pathname : "#" + page));
   window.scrollTo({ top: 0 });
 }
 $("#nav").addEventListener("click", (e) => { const p = e.target.dataset?.p; if (p) go(p); });
-if (["#guide", "#calc"].includes(location.hash)) go(location.hash.slice(1));
+if (["#guide", "#calc", "#fav"].includes(location.hash)) go(location.hash.slice(1));
+saveFavs();
 
 // ---------- 지도 (카카오맵, 화면에서 그때그때 주소→좌표. 좌표는 저장하지 않음) ----------
 let kakaoReady = null, mapView = false, bigMap = null, bigMarkers = [];
@@ -965,6 +1021,10 @@ $("#chatForm").addEventListener("submit", async (e) => {
     $("#sido").value = state.sido; drawSgg(); $("#sgg").value = state.sgg;
     if (state.sido || state.q) search(false);
     if (u.get("inst")) openDetail(u.get("inst"));
+    else if (u.get("cmp")) {
+      const ids = u.get("cmp").split(",").filter((x) => /^[\w-]{1,40}$/.test(x)).slice(0, 5);
+      if (ids.length >= 2) { picks = ids; savePicks(); $("#trayGo").click(); }
+    }
   } catch (e) { $("#sido").innerHTML = `<option value="">지역을 불러오지 못했습니다</option>`; }
 })();
 </script>
