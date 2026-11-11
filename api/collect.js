@@ -33,11 +33,22 @@ export default async function handler(req, res) {
       const st = await getState("list");
       if (st.day === today() && st.done) return res.status(200).json({ 목록: "오늘 이미 끝남", ...st });
       let s = st.day === today() ? st : { day: today(), i: 0, page: 1, got: 0, saved: 0, done: false };
+      let busy = 0;
       while (left() > 8000 && s.i < SIDOS.length) {
-        const { total, rows } = await listPage(SIDOS[s.i], s.page);
+        let page;
+        try { page = await listPage(SIDOS[s.i], s.page); }
+        catch (e) {
+          // 상세 수집과 겹쳐 초당 한도에 걸리면 잠깐 쉬었다가 같은 쪽을 다시 받음 (오늘 한도 초과 등은 멈춤)
+          if (/초당/.test(e.message) && ++busy <= 6 && left() > 12000) { await new Promise((r) => setTimeout(r, 3000)); continue; }
+          s.lastErr = e.message.slice(0, 120); await setState("list", s);
+          return res.status(200).json({ 목록: "잠시 멈춤 — 조금 뒤 다시 불러 주시면 이어서 받습니다", ...s, 다음시도: SIDOS[s.i] || null });
+        }
+        const { total, rows } = page;
         if (rows.length) await sb("POST", "ltc_insts?on_conflict=sym,pttn", rows, { Prefer: "resolution=merge-duplicates,return=minimal" });
         s.saved += rows.length; s.got = (s.got || 0) + rows.length;
         if (!rows.length || s.got >= total) { s.i++; s.page = 1; s.got = 0; } else s.page++;
+        await setState("list", s);   // 한 쪽 받을 때마다 저장 (중간에 끊겨도 이어서)
+        await new Promise((r) => setTimeout(r, 300));
       }
       if (s.i >= SIDOS.length) s.done = true;
       await setState("list", s);
