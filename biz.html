@@ -59,6 +59,10 @@ tr.me td{background:#fff7e0;font-weight:700}
 .out b{font-size:1.4rem;color:var(--main)}
 .note{background:var(--warm-soft);border-radius:10px;padding:10px 12px;font-size:.88rem;margin-top:14px}
 .btn{display:inline-block;border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 12px;text-decoration:none;color:var(--ink);font-size:.92rem;cursor:pointer}
+.lnk{border:0;background:none;color:var(--main);font-weight:700;cursor:pointer;padding:0 2px;font-size:.9em}
+dialog{border:0;border-radius:16px;max-width:560px;width:calc(100% - 32px);padding:20px}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+dialog table td,dialog table th{white-space:normal;text-align:left}
 .btn.pri{background:var(--main);border-color:var(--main);color:#fff}
 footer{padding:28px 0 40px;color:var(--sub);font-size:.85rem}
 footer p{margin:6px 0}
@@ -110,6 +114,18 @@ footer p{margin:6px 0}
   <p class="note">이 페이지의 숫자는 국민건강보험공단이 공개한 장기요양기관 정보와 행정안전부 주민등록 인구(2026년 10월 말 기준, 공공데이터포털)를 모은 것입니다. 요양시설은 자녀 집 근처로 고르는 경우가 많아, 어르신 주소지 인구와 실제 이용 지역은 다를 수 있습니다. 정원·현원·대기는 기관이 공단에 신고한 값이라 실제와 다를 수 있습니다. 창업 판단은 현장 조사, 관할 지자체 지정 기준 확인, 전문가 상담과 함께 하시길 권해 드립니다. 케어온길은 특정 지역이나 기관을 추천하지 않습니다.</p>
 </main>
 
+<dialog id="info"><h3 style="margin:0 0 8px">80세 이상 1,000명당 정원이란?</h3>
+  <p style="margin:0 0 8px">그 지역에 사는 <b>80세 이상 어르신 1,000명당 기관 정원(자리)이 몇 개인지</b>를 나타냅니다. 고령 인구에 비해 자리가 얼마나 많은지 보는 <b>공급 밀도</b> 지표입니다. 방문 서비스는 정원이 없어 1만 명당 기관 수로 봅니다.</p>
+  <p class="muted" style="margin:0 0 8px;font-size:.9rem">예) 정원 4,765명 ÷ 80세 이상 13,768명 × 1,000 = 346.1 → 어르신 약 3명당 1자리</p>
+  <p style="margin:0 0 4px"><b>이용률·대기와 함께 보셔야 뜻이 분명해집니다.</b></p>
+  <table><tr><th>천명당 정원</th><th>이용률·대기</th><th>해석</th></tr>
+    <tr><td>낮음</td><td>높음</td><td>자리가 부족한 편입니다</td></tr>
+    <tr><td>높음</td><td>높음</td><td>다른 지역 수요까지 들어오는 곳입니다</td></tr>
+    <tr><td>높음</td><td>낮음</td><td>자리가 남아 경쟁이 치열한 편입니다</td></tr>
+    <tr><td>낮음</td><td>낮음</td><td>이용 수요 자체가 적은 편입니다</td></tr></table>
+  <p class="muted" style="font-size:.85rem;margin:10px 0">'낮음·높음'은 같은 시·도 평균과 비교한 것입니다(15% 이상 차이). 요양시설은 자녀 집 근처로 고르는 경우가 많아, 대도시 주변은 고령 인구보다 실제 수요가 클 수 있습니다. 판단 근거가 아닌 참고용 지표입니다.</p>
+  <button class="btn pri" type="button" id="infoClose">닫기</button></dialog>
+
 <footer><div class="wrap">
   <p><a href="/">케어온길 (보호자용)</a> · <a href="https://www.goodmok.co.kr/" target="_blank" rel="noopener">좋은목 (상가·경매)</a> · <a href="/privacy.html"><b>개인정보처리방침</b></a> · <a href="/terms.html">이용약관</a></p>
   <p>주식회사 벤투런 · 대표 문창조 · 사업자등록번호 588-86-02083 · 통신판매업 제2026-고양일산동-1926호<br>
@@ -150,11 +166,17 @@ function signal(o, base) {
     // 시·도 전체를 본 경우: 아래 시·군·구 표에서 지역별 차이를 보시도록 안내
     t = `시·도 전체 이용률은 ${o.occ}%이고, ${waitTxt}. 시·군·구마다 차이가 크니 아래 표에서 지역별로 비교해 보실 수 있습니다.`;
   }
-  if (base && o.capPer1k80 != null && base.capPer1k80) {
-    const r = o.capPer1k80 / base.capPer1k80;
-    t += r <= 0.85 ? ` 80세 이상 인구에 비해 <b>정원은 시·도 평균보다 적은 편</b>입니다(1,000명당 ${o.capPer1k80}명 / 평균 ${base.capPer1k80}명).`
-      : r >= 1.15 ? ` 80세 이상 인구에 비해 <b>정원은 시·도 평균보다 많은 편</b>입니다(1,000명당 ${o.capPer1k80}명 / 평균 ${base.capPer1k80}명).`
-      : ` 80세 이상 인구 대비 정원은 시·도 평균과 비슷합니다(1,000명당 ${o.capPer1k80}명).`;
+  if (base && o.capPer1k80 != null && base.capPer1k80 && base.occ != null) {
+    const r = o.capPer1k80 / base.capPer1k80, d = o.occ - base.occ;
+    const cap = r <= 0.85 ? "low" : r >= 1.15 ? "high" : "mid", use = d >= 5 || (d > -5 && o.wait > 0 && o.occ >= base.occ) ? "high" : d <= -5 ? "low" : "mid";
+    const ratio = `80세 이상 1,000명당 정원 ${o.capPer1k80}명, 시·도 평균 ${base.capPer1k80}명`;
+    const msg = {
+      "low-high": "고령 인구에 비해 <b>자리가 적은데 이용률은 높아, 공급이 부족한 편</b>으로 보입니다.",
+      "high-high": "고령 인구에 비해 <b>자리가 많은데도 이용률이 높아, 다른 지역 수요까지 들어오는 곳</b>으로 보입니다.",
+      "high-low": "고령 인구에 비해 <b>자리가 많고 이용률은 낮아, 경쟁이 치열한 편</b>으로 보입니다.",
+      "low-low": "고령 인구에 비해 <b>자리도 적고 이용률도 낮아, 이용 수요 자체가 적은 편</b>으로 보입니다.",
+    }[`${cap}-${use}`] || (cap === "mid" ? "고령 인구 대비 자리 수는 시·도 평균과 비슷합니다." : cap === "low" ? "고령 인구에 비해 자리는 적은 편입니다." : "고령 인구에 비해 자리는 많은 편입니다.");
+    t += ` ${msg} (${ratio}) <button type="button" class="lnk" data-info="density">ⓘ 해석</button>`;
   }
   return `<div class="signal">참고 신호: ${t} 최근 3년 사이 새로 지정된 기관은 ${num(o.new3y)}곳입니다. <span class="muted">(판단 근거가 아닌 참고용 지표입니다)</span></div>`;
 }
@@ -186,7 +208,7 @@ async function run() {
     if (o.pop) {
       h += `<div class="kpi"><small>65세 이상 인구</small><b>${num(o.pop.p65)}명</b><span class="cmp">고령화율 ${o.pop.aged}%${base?.pop ? ` · 시·도 ${base.pop.aged}%` : ""}</span></div>
         <div class="kpi"><small>80세 이상 인구</small><b>${num(o.pop.p80)}명</b><span class="cmp">85세 이상 ${num(o.pop.p85)}명</span></div>`;
-      if (stay && o.capPer1k80 != null) h += `<div class="kpi"><small>80세 이상 1,000명당 정원</small><b>${o.capPer1k80}명</b>${base?.capPer1k80 != null ? `<span class="cmp">시·도 평균 ${base.capPer1k80}명</span>` : ""}</div>`;
+      if (stay && o.capPer1k80 != null) h += `<div class="kpi"><small>80세 이상 1,000명당 정원 <button type="button" class="lnk" data-info="density">ⓘ</button></small><b>${o.capPer1k80}명</b>${base?.capPer1k80 != null ? `<span class="cmp">시·도 평균 ${base.capPer1k80}명</span>` : ""}</div>`;
       if (!stay && o.instPer10k80 != null) h += `<div class="kpi"><small>80세 이상 1만 명당 기관</small><b>${o.instPer10k80}곳</b>${base?.instPer10k80 != null ? `<span class="cmp">시·도 평균 ${base.instPer10k80}곳</span>` : ""}</div>`;
     }
     h += `</div>`;
@@ -196,7 +218,7 @@ async function run() {
     // 시군구별 표
     const list = j.sggs.filter((x) => x.n || x.pop).sort((a, b) => (stay ? (b.occ ?? -1) - (a.occ ?? -1) : b.n - a.n));
     h += `<h3 style="margin:18px 0 0;font-size:1rem">${esc(sidoNm)} 시·군·구별 ${stay ? "(이용률 높은 순)" : "(기관 수 많은 순)"}</h3><div class="tbl"><table>
-      <tr><th>시·군·구</th><th>기관</th>${stay ? "<th>정원</th><th>이용률</th><th>대기</th>" : ""}<th>신규(3년)</th><th>80세+ 인구</th><th>${stay ? "80세+ 천명당 정원" : "80세+ 만명당 기관"}</th></tr>
+      <tr><th>시·군·구</th><th>기관</th>${stay ? "<th>정원</th><th>이용률</th><th>대기</th>" : ""}<th>신규(3년)</th><th>80세+ 인구</th><th>${stay ? "80세+ 천명당 정원" : "80세+ 만명당 기관"} <button type="button" class="lnk" data-info="density">ⓘ</button></th></tr>
       ${list.map((x) => `<tr class="${x.cd === sgg ? "me" : ""}"><td>${esc(sggName(sido, x.cd, x.nm))}</td><td>${num(x.n)}</td>${stay ? `<td>${num(x.capacity)}</td><td>${x.occ == null ? "–" : x.occ + "%"}</td><td>${num(x.wait)}</td>` : ""}<td>${num(x.new3y)}</td><td>${x.pop ? num(x.pop.p80) : "–"}</td><td>${stay ? (x.capPer1k80 ?? "–") : (x.instPer10k80 ?? "–")}</td></tr>`).join("")}
     </table></div>`;
     if (["11", "28", "41"].includes(sido)) h += `<div class="note" style="background:var(--main-soft)">자리를 알아보고 계신가요? 같은 회사(주식회사 벤투런)가 운영하는 <b>좋은목</b>에서 ${esc(sidoNm)}의 상가·사무실 매물과 동네 분석을 보실 수 있습니다.
@@ -225,6 +247,8 @@ function sim() {
 $("#sKind").addEventListener("change", () => { $("#sDays").value = $("#sKind").value === "day" ? 22 : 30; sim(); });
 sim();
 
+document.addEventListener("click", (e) => { if (e.target.closest("[data-info]")) $("#info").showModal(); });
+$("#infoClose").addEventListener("click", () => $("#info").close());
 (async function init() {
   try {
     regions = (await api({ mode: "regions" })).sidos;
