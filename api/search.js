@@ -5,6 +5,7 @@
 //      sort: name(이름순) | capacity(정원 큰 순) | new(최근 지정) | old(오래된 곳) | grade(평가 등급 순)
 //  /api/search?id=기관기호:유형코드                           → 1곳 상세
 //  /api/search?ids=기호:유형,기호:유형 (최대 5곳)              → 비교
+//  /api/search?mode=stats&sido=41&sgg=110&kind=daycare          → 창업 참고용 지역 요약 (시도 전체 + 시군구별)
 export const config = { maxDuration: 15 };
 const SB_URL = (process.env.SUPABASE_URL ?? "").trim().replace(/\/+$/, "").replace(/\/rest\/v1$/, "");
 const SB_KEY = process.env.SUPABASE_SECRET_KEY ?? "";
@@ -72,6 +73,41 @@ export default async function handler(req, res) {
       }
       res.setHeader("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=86400");
       return res.status(200).json({ sidos: [...by.values()].sort((a, b) => a.cd.localeCompare(b.cd)), kinds: KIND_NM });
+    }
+
+    // 1-2) 창업 참고용 지역 요약 (케어온길 비즈)
+    if (q.mode === "stats") {
+      const sido = /^\d{2}$/.test(q.sido || "") ? q.sido : null;
+      const sgg = /^\d{3}$/.test(q.sgg || "") ? q.sgg : null;
+      const kind = String(q.kind || "");
+      if (!sido || !(kind in KIND_NM) || ["unit", "other", "tool"].includes(kind)) return res.status(400).json({ 오류: "시·도와 기관 종류를 골라 주시면 됩니다" });
+      const rows = [];
+      for (let off = 0; off < 20000; off += 1000) {
+        const { data } = await sb(`ltc_insts?select=sgg_cd,capacity,now_m,now_f,wait_m,wait_f,eval_grade,designated,detail_at&sido_cd=eq.${sido}&kind=eq.${kind}&order=sym.asc,pttn.asc&limit=1000&offset=${off}`);
+        rows.push(...data);
+        if (data.length < 1000) break;
+      }
+      const since = new Date(Date.now() - 3 * 365.25 * 864e5).toISOString().slice(0, 10);
+      const agg = (list) => {
+        const o = { n: list.length, detail: 0, capacity: 0, now: 0, wait: 0, capN: 0, new3y: 0, grades: { A: 0, B: 0, C: 0, D: 0, E: 0, 없음: 0 } };
+        for (const r of list) {
+          if (r.detail_at) o.detail++;
+          const now = sum(r.now_m, r.now_f), wait = sum(r.wait_m, r.wait_f);
+          if (r.capacity != null && now != null) { o.capacity += r.capacity; o.now += now; o.capN++; }
+          if (wait != null) o.wait += wait;
+          if (r.designated && r.designated >= since) o.new3y++;
+          o.grades[/^[A-E]$/.test(r.eval_grade || "") ? r.eval_grade : "없음"]++;
+        }
+        o.occ = o.capacity ? Math.round((o.now / o.capacity) * 1000) / 10 : null;
+        o.vacancy = o.capacity ? Math.max(0, o.capacity - o.now) : null;
+        return o;
+      };
+      const bySgg = new Map();
+      for (const r of rows) { if (!bySgg.has(r.sgg_cd)) bySgg.set(r.sgg_cd, []); bySgg.get(r.sgg_cd).push(r); }
+      res.setHeader("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=86400");
+      return res.status(200).json({ sido, sgg, kind, kind_nm: KIND_NM[kind], since,
+        sidoStats: agg(rows), sggStats: sgg ? agg(bySgg.get(sgg) || []) : null,
+        sggs: [...bySgg.entries()].map(([cd, l]) => ({ cd, ...agg(l) })) });
     }
 
     // 2) 한 곳 또는 여러 곳(비교)
