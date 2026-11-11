@@ -111,7 +111,7 @@ footer p{margin:6px 0}
 </main>
 
 <footer><div class="wrap">
-  <p><a href="/">케어온길 (보호자용)</a> · <a href="/privacy.html"><b>개인정보처리방침</b></a> · <a href="/terms.html">이용약관</a></p>
+  <p><a href="/">케어온길 (보호자용)</a> · <a href="https://www.goodmok.co.kr/" target="_blank" rel="noopener">좋은목 (상가·경매)</a> · <a href="/privacy.html"><b>개인정보처리방침</b></a> · <a href="/terms.html">이용약관</a></p>
   <p>주식회사 벤투런 · 대표 문창조 · 사업자등록번호 588-86-02083 · 통신판매업 제2026-고양일산동-1926호<br>
   경기도 고양시 일산동구 위시티4로 80, 111동 17층 1702호 · 031-818-6336 · moongoldenj@naver.com</p>
 </div></footer>
@@ -186,6 +186,8 @@ async function run() {
       <tr><th>시·군·구</th><th>기관</th>${stay ? "<th>정원</th><th>이용률</th><th>대기</th>" : ""}<th>신규(3년)</th></tr>
       ${list.map((x) => `<tr class="${x.cd === sgg ? "me" : ""}"><td>${esc(sggName(sido, x.cd))}</td><td>${num(x.n)}</td>${stay ? `<td>${num(x.capacity)}</td><td>${x.occ == null ? "–" : x.occ + "%"}</td><td>${num(x.wait)}</td>` : ""}<td>${num(x.new3y)}</td></tr>`).join("")}
     </table></div>`;
+    if (["11", "28", "41"].includes(sido)) h += `<div class="note" style="background:var(--main-soft)">자리를 알아보고 계신가요? 같은 회사(주식회사 벤투런)가 운영하는 <b>좋은목</b>에서 ${esc(sidoNm)}의 상가·사무실 매물과 동네 분석을 보실 수 있습니다.
+      <a class="btn" style="margin-top:8px" href="https://www.goodmok.co.kr/" target="_blank" rel="noopener">좋은목에서 매물 보기 ›</a></div>`;
     $("#res").innerHTML = h;
     $("#mail").href = `mailto:moongoldenj@naver.com?subject=${encodeURIComponent(`케어온길 지역 리포트 문의 — ${place} ${j.kind_nm}`)}`;
     if (stay && avg(o)) { $("#sCap").value = Math.round(avg(o)); if (o.occ != null) $("#sOcc").value = Math.round(o.occ); $("#sKind").value = kind === "daycare" ? "day" : kind; $("#sDays").value = kind === "daycare" ? 22 : 30; sim(); }
