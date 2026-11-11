@@ -102,12 +102,26 @@ export default async function handler(req, res) {
         o.vacancy = o.capacity ? Math.max(0, o.capacity - o.now) : null;
         return o;
       };
+      // 고령 인구 (행정안전부 주민등록 인구, pop_sgg 표에서 가장 최근 달)
+      const { data: pops } = await sb(`pop_sgg?select=sgg_cd,sgg_nm,ym,total,p65,p75,p80_89,p85,p90&sido_cd=eq.${sido}&order=ym.desc`).catch(() => ({ data: [] }));
+      const popYm = pops[0]?.ym || null, pop = new Map();
+      for (const x of pops) if (x.ym === popYm) pop.set(x.sgg_cd, x);
+      const addPop = (o, list) => {
+        if (!list.length) return o;
+        const t = list.reduce((a, x) => ({ total: a.total + x.total, p65: a.p65 + x.p65, p75: a.p75 + x.p75, p80: a.p80 + x.p80_89 + x.p90, p85: a.p85 + x.p85 }), { total: 0, p65: 0, p75: 0, p80: 0, p85: 0 });
+        o.pop = { ...t, ym: popYm, aged: t.total ? Math.round((t.p65 / t.total) * 1000) / 10 : null };
+        if (t.p80) { o.capPer1k80 = o.capN ? Math.round((o.capacity / t.p80) * 10000) / 10 : (o.n === 0 ? 0 : null); o.instPer10k80 = Math.round((o.n / t.p80) * 100000) / 10; }
+        return o;
+      };
       const bySgg = new Map();
       for (const r of rows) { if (!bySgg.has(r.sgg_cd)) bySgg.set(r.sgg_cd, []); bySgg.get(r.sgg_cd).push(r); }
       res.setHeader("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=86400");
-      return res.status(200).json({ sido, sgg, kind, kind_nm: KIND_NM[kind], since,
-        sidoStats: agg(rows), sggStats: sgg ? agg(bySgg.get(sgg) || []) : null,
-        sggs: [...bySgg.entries()].map(([cd, l]) => ({ cd, ...agg(l) })) });
+      // 인구는 있는데 기관이 없는 시·군·구도 표에 나오게 함 (진입 기회 확인용)
+      for (const cd of pop.keys()) if (!bySgg.has(cd)) bySgg.set(cd, []);
+      return res.status(200).json({ sido, sgg, kind, kind_nm: KIND_NM[kind], since, popYm,
+        sidoStats: addPop(agg(rows), [...pop.values()]),
+        sggStats: sgg ? addPop(agg(bySgg.get(sgg) || []), pop.has(sgg) ? [pop.get(sgg)] : []) : null,
+        sggs: [...bySgg.entries()].map(([cd, l]) => ({ cd, nm: pop.get(cd)?.sgg_nm || null, ...addPop(agg(l), pop.has(cd) ? [pop.get(cd)] : []) })) });
     }
 
     // 2) 한 곳 또는 여러 곳(비교)
