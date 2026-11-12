@@ -144,6 +144,18 @@ footer p{margin:4px 0}
 .btn.more.hint{animation:hint 1.1s ease-in-out 2}
 @keyframes hint{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(47,107,79,.45)}50%{transform:scale(1.06);box-shadow:0 0 0 8px rgba(47,107,79,0)}}
 @media (prefers-reduced-motion:reduce){.btn.more.hint{animation:none}}
+.bizcard{display:flex;align-items:center;gap:12px;margin-top:20px;padding:14px 16px;border:1.5px solid var(--warm);border-radius:14px;background:var(--warm-soft);color:var(--ink);text-decoration:none}
+.bizcard[hidden]{display:none}
+.bizcard .bz-ic{font-size:1.6rem}
+.bizcard .bz-tx{flex:1;display:flex;flex-direction:column;gap:2px}
+.bizcard .bz-tx small{color:var(--sub);font-size:.84rem}
+.bizcard .bz-go{flex:none;background:var(--warm);color:#fff;font-weight:700;border-radius:999px;padding:7px 13px;font-size:.9rem}
+.bizcard:hover{box-shadow:0 4px 14px rgba(200,118,47,.2)}
+.bizcard.hint{animation:bzhint 1.2s ease-in-out 2}
+@keyframes bzhint{0%,100%{box-shadow:0 0 0 0 rgba(200,118,47,.5)}50%{box-shadow:0 0 0 9px rgba(200,118,47,0)}}
+@media (prefers-reduced-motion:reduce){.bizcard.hint{animation:none}}
+@media (max-width:560px){.bizcard{flex-wrap:wrap}.bizcard .bz-go{margin-left:auto}}
+.bizfoot{display:inline-block;border:1px solid var(--warm);color:var(--warm);border-radius:999px;padding:6px 14px;text-decoration:none;font-weight:700;background:#fff}
 .btn.fav-on{background:#fff7e0;border-color:#e8b923;color:#8a6200;font-weight:700}
 #nav button b{margin-left:3px}
 .btn.kshare{background:#FEE500;border-color:#FEE500;color:#191919}
@@ -189,7 +201,10 @@ footer p{margin:4px 0}
   <div id="mapBox" hidden></div>
   <div class="list" id="list"></div>
   <div class="pager" id="pager"></div>
-  <p class="muted" id="bizHint" hidden style="font-size:.88rem;margin-top:18px">이 지역에서 기관 운영이나 창업을 고민 중이신가요? <a id="bizLink" href="/biz">지역 요약 보기 ›</a></p>
+  <a class="bizcard" id="bizLink" href="/biz" hidden>
+    <span class="bz-ic" aria-hidden="true">🏢</span>
+    <span class="bz-tx"><b>기관 운영·창업을 준비하시나요?</b><small>이 지역의 기관 수·이용률·고령 인구를 무료로 보실 수 있습니다 · 케어온길 비즈</small></span>
+    <span class="bz-go">지역 요약 보기 ›</span></a>
 </main>
 <section class="wrap page" id="fav" hidden>
   <div class="meta"><h2>☆ 관심 기관</h2><span class="muted">부모님이 계신 기관이나 눈여겨본 기관을 모아 두고 바로 여실 수 있습니다</span></div>
@@ -345,7 +360,7 @@ footer p{margin:4px 0}
 
 <footer><div class="wrap">
   <p>자료: 국민건강보험공단 장기요양기관 정보(공공데이터포털). 정원·현원·대기 인원은 공단에 신고된 값이라 실제와 다를 수 있으니 기관에 전화로 확인해 보시길 권해 드립니다.</p>
-  <p><a href="/biz">기관 운영·창업 정보 (케어온길 비즈)</a></p>
+  <p><a class="bizfoot" href="/biz">🏢 기관 운영·창업 정보 — 케어온길 비즈 ›</a></p>
   <p><a href="/privacy.html"><b>개인정보처리방침</b></a> · <a href="/terms.html">이용약관</a> · <a href="/location.html">위치기반서비스 이용약관</a> · <a href="#" id="locWithdraw">위치 이용 동의 철회</a></p>
   <p>유튜브 <a href="https://www.youtube.com/@careongil" target="_blank" rel="noopener"><b>케어온길 TV</b></a>에서 요양시설 고르는 법을 영상으로 보실 수 있습니다.</p>
   <p>케어온길은 기관 정보를 모아 보여 주는 서비스이며 장기요양등급 판정, 의료 판단, 입소 확정을 대신하지 않습니다.</p>
@@ -460,7 +475,7 @@ async function search(scroll) {
     $("#hint").textContent = j.total ? `${j.page} / ${j.pages}쪽` : "";
     j.rows.forEach((r) => rowCache.set(r.id, r));
     if (state.sido) { const bk = state.kinds.find((k) => ["daycare","home","short","visit_care","visit_bath","visit_nurse"].includes(k)) || "daycare";
-      $("#bizLink").href = "/biz?" + new URLSearchParams({ sido: state.sido, ...(state.sgg ? { sgg: state.sgg } : {}), kind: bk }); $("#bizHint").hidden = false; }
+      $("#bizLink").href = "/biz?" + new URLSearchParams({ sido: state.sido, ...(state.sgg ? { sgg: state.sgg } : {}), kind: bk }); const bc = $("#bizLink"); if (bc.hidden) { bc.hidden = false; bc.classList.add("hint"); } }
     $("#list").innerHTML = j.rows.length ? j.rows.map(card).join("") : `<div class="empty">조건에 맞는 기관이 없습니다. 종류나 지역을 넓혀서 찾아보실 수 있습니다.</div>`;
     if (!window._hinted) { const m = $("#list .btn.more"); if (m) { m.classList.add("hint"); window._hinted = true; } }
     if (j.pages > 1) $("#pager").innerHTML =
