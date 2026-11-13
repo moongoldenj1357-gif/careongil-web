@@ -66,6 +66,14 @@ dialog{border:0;border-radius:16px;max-width:560px;width:calc(100% - 32px);paddi
 dialog::backdrop{background:rgba(0,0,0,.35)}
 dialog table td,dialog table th{white-space:normal;text-align:left}
 .btn.pri{background:var(--main);border-color:var(--main);color:#fff}
+input.txt,input[type=email],input[type=tel]{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.pick{display:flex;flex-wrap:wrap;gap:8px}
+.pick label{border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:#fff;cursor:pointer}
+.pick label:has(input:checked){border-color:var(--main);background:var(--main-soft);font-weight:700}
+.pick small{color:var(--sub);font-weight:400}
+.agree{margin-top:14px;background:#faf8f3;border-radius:10px;padding:10px 12px;font-size:.88rem}
+.agree p{margin:2px 0 8px 24px;color:var(--sub);font-size:.8rem}
+.err{color:#b4472f;font-weight:700}
 footer{padding:28px 0 40px;color:var(--sub);font-size:.85rem}
 footer p{margin:6px 0}
 </style>
@@ -108,35 +116,82 @@ footer p{margin:6px 0}
   </section>
 
   <section class="panel" id="report">
-    <h2>지역 분석 리포트</h2>
-    <p class="muted" style="margin:0 0 12px">무료 요약보다 깊이, 그 지역 경쟁 기관을 하나하나 살펴보고 손익까지 계산해 드리는 PDF 리포트입니다. 먼저 견본을 보시고 결정하실 수 있습니다.</p>
+    <h2>지역 분석 리포트 신청</h2>
+    <p class="muted" style="margin:0 0 12px">무료 요약보다 깊이, 그 지역 경쟁 기관을 하나하나 살펴보고 손익까지 계산해 드리는 리포트입니다. 신청하고 입금하시면, 입금이 확인되는 대로 보고서가 바로 발행됩니다. 먼저 견본을 보고 결정하실 수 있습니다.</p>
     <div style="display:flex;flex-wrap:wrap;gap:8px">
-      <a class="btn" href="/sample-report.pdf" target="_blank" rel="noopener">📄 기본 리포트 견본 (33,000원)</a>
-      <a class="btn" href="/sample-report-detail.pdf" target="_blank" rel="noopener">📄 상세 리포트 견본 (55,000원)</a>
+      <a class="btn" href="/sample-report.pdf" target="_blank" rel="noopener">📄 기본 리포트 견본</a>
+      <a class="btn" href="/sample-report-detail.pdf" target="_blank" rel="noopener">📄 상세 리포트 견본</a>
     </div>
-    <p class="muted" style="margin:8px 0 0;font-size:13px">견본 지역: 고양시 일산동구 · 요양원 (PDF). 기관별 평가 이력은 견본에서는 가렸고, 실제 보고서에는 공개됩니다.</p>
+    <p class="muted" style="margin:8px 0 0;font-size:13px">견본 지역: 고양시 일산동구 · 요양원 (PDF). 기관별 평가 이력은 견본에서는 가렸고, 실제 보고서에는 공개됩니다. 상세 견본의 'B. 맞춤 손익'이 맞춤형 종합 분석에 들어가는 내용입니다.</p>
     <div class="tbl"><table class="plans">
-      <tr><th></th><th>기본 리포트</th><th>상세 리포트</th></tr>
-      <tr><td>가격 (부가세 포함)</td><td><b>33,000원</b></td><td><b>55,000원</b></td></tr>
-      <tr><td>고령 인구·수요</td><td>현재 시점, 인근 지역 비교</td><td>+ 최근 5년 추이, 장래 추계</td></tr>
-      <tr><td>공급·경쟁</td><td>규모별·평가 등급별 분석, 정원 상위 10곳</td><td>+ 기관 전체 목록 (정원·현원·대기·평가 이력)</td></tr>
-      <tr><td>운영 비교</td><td>인력·침실·비급여 중간값</td><td>+ 기관별 비급여·인력 표</td></tr>
-      <tr><td>손익 모의계산</td><td>표준 가정 (정원 30·50·70인)</td><td>의뢰하신 분의 임대료·인력 계획으로 계산</td></tr>
-      <tr><td>받으시는 때</td><td>신청 후 영업일 2일 안</td><td>신청 후 영업일 4일 안</td></tr>
+      <tr><th></th><th>기본</th><th>상세</th><th>맞춤형 종합 분석</th></tr>
+      <tr><td>가격 (부가세 포함)</td><td><b>33,000원</b></td><td><b>55,000원</b></td><td><b>99,000원</b></td></tr>
+      <tr><td>고령 인구·수요</td><td>현재 고령 인구, 시·군·구 비교</td><td>+ 5년 뒤 고령 인구 전망</td><td>상세와 같음</td></tr>
+      <tr><td>공급·경쟁</td><td>규모별·평가 등급별 분석, 정원 상위 10곳</td><td>+ 기관 전체 목록 (정원·현원·대기·요양보호사·평가 이력)</td><td>+ <b>예정지 주소 반경 1·2·3km 경쟁 기관</b></td></tr>
+      <tr><td>손익</td><td>표준 가정 (정원 3가지)</td><td>+ 개원 후 운영자금 (표준 가정)</td><td><b>내 조건(정원·임대료·인건비·초기 투자)</b>으로 손익분기점, 운영자금, 조건 변화표, 인력 점검</td></tr>
     </table></div>
-    <p class="note" style="background:var(--main-soft)"><b>오픈 기념:</b> 처음 신청하시는 20분께는 반값(기본 16,500원 · 상세 27,500원, 부가세 포함)으로 만들어 드립니다.</p>
-    <h3 style="margin:16px 0 6px;font-size:1rem">신청 방법</h3>
-    <ol style="margin:0;padding-left:20px">
-      <li>아래 버튼으로 메일을 보내 주십시오. 지역(시·군·구), 기관 종류, 기본·상세 중 원하시는 것을 적어 주시면 됩니다.</li>
-      <li>결제 안내(계좌이체 또는 결제 링크)를 답장으로 드립니다.</li>
-      <li>결제가 확인되면 리포트를 만들어 PDF로 보내 드립니다.</li>
-    </ol>
-    <a class="btn pri" id="mail" style="margin-top:12px" href="mailto:moongoldenj@naver.com?subject=%EC%BC%80%EC%96%B4%EC%98%A8%EA%B8%B8%20%EC%A7%80%EC%97%AD%20%EB%A6%AC%ED%8F%AC%ED%8A%B8%20%EC%8B%A0%EC%B2%AD">✉️ 리포트 신청 메일 보내기</a>
+    <p class="note" style="background:var(--main-soft)"><b>오픈 기념:</b> 처음 발행되는 20건까지는 반값(기본 16,500원 · 상세 27,500원 · 맞춤형 49,500원)입니다. 신청하시면 입금하실 금액이 바로 나옵니다.</p>
+
+    <form id="of" autocomplete="on" novalidate>
+      <h3 style="margin:18px 0 6px;font-size:1rem">① 상품</h3>
+      <div class="pick">
+        <label><input type="radio" name="product" value="basic"> 기본 <small>33,000원</small></label>
+        <label><input type="radio" name="product" value="detail" checked> 상세 <small>55,000원</small></label>
+        <label><input type="radio" name="product" value="custom"> 맞춤형 종합 분석 <small>99,000원</small></label>
+      </div>
+      <h3 style="margin:16px 0 6px;font-size:1rem">② 지역과 기관 종류</h3>
+      <div class="row">
+        <div><label class="f" for="oSido">시·도</label><select id="oSido"></select></div>
+        <div><label class="f" for="oSgg">시·군·구</label><select id="oSgg"><option value="">시·도를 먼저 골라 주세요</option></select></div>
+        <div><label class="f" for="oKind">기관 종류</label><select id="oKind"><option value="daycare">주야간보호</option><option value="home">요양원</option><option value="short">단기보호</option></select></div>
+      </div>
+      <div id="cust" hidden>
+        <h3 style="margin:16px 0 6px;font-size:1rem">③ 내 창업 조건 <span class="muted" style="font-weight:400;font-size:.85rem">(금액은 만 원 단위)</span></h3>
+        <div class="row">
+          <div><label class="f" for="cCap">정원 (명) *</label><input type="number" id="cCap" min="1" max="300" placeholder="예: 30"></div>
+          <div><label class="f" for="cRent">월 임대료 (만 원) *</label><input type="number" id="cRent" min="0" placeholder="예: 500 (자가면 0)"></div>
+          <div><label class="f" for="cLabor">월 인건비 합계 (만 원)</label><input type="number" id="cLabor" min="0" placeholder="모르시면 비워 두세요"></div>
+          <div><label class="f" for="cOther">기타 운영비 (만 원/월)</label><input type="number" id="cOther" min="0" placeholder="식재료·차량·공과금 등"></div>
+          <div><label class="f" for="cInvest">초기 투자 (만 원)</label><input type="number" id="cInvest" min="0" placeholder="인테리어·장비·차량 등"></div>
+          <div><label class="f" for="cDeposit">보증금 (만 원)</label><input type="number" id="cDeposit" min="0" placeholder="선택"></div>
+          <div id="cDaysW"><label class="f" for="cDays">월 이용일 (주야간보호)</label><select id="cDays"><option value="22">22일 (주 5일)</option><option value="26">26일 (주 6일)</option><option value="20">20일</option></select></div>
+        </div>
+        <label class="f" for="cAddr" style="margin-top:10px">예정지 주소 (반경 분석용, 도로명 또는 지번)</label>
+        <input type="text" id="cAddr" class="txt" maxlength="100" placeholder="예: 경기도 고양시 일산서구 주엽로 000">
+        <p class="muted" style="font-size:.82rem;margin:4px 0 0">비워 두신 인건비·운영비는 표준 가정으로 계산하고, 보고서에 그렇게 표시합니다.</p>
+      </div>
+      <h3 style="margin:16px 0 6px;font-size:1rem"><span id="stepN">③</span> 신청하시는 분</h3>
+      <div class="row">
+        <div><label class="f" for="oName">성함 (입금자명) *</label><input type="text" id="oName" class="txt" maxlength="20" autocomplete="name"></div>
+        <div><label class="f" for="oPhone">휴대폰 *</label><input type="tel" id="oPhone" class="txt" maxlength="13" autocomplete="tel" placeholder="010-0000-0000"></div>
+        <div><label class="f" for="oEmail">이메일 (선택)</label><input type="email" id="oEmail" class="txt" maxlength="80" autocomplete="email"></div>
+      </div>
+      <label class="f" style="margin-top:10px">증빙</label>
+      <div class="pick">
+        <label><input type="radio" name="rc" value="none" checked> 필요 없음</label>
+        <label><input type="radio" name="rc" value="cash"> 현금영수증</label>
+        <label><input type="radio" name="rc" value="tax"> 세금계산서</label>
+      </div>
+      <div class="row" id="rcF" hidden>
+        <div><label class="f" for="rNo" id="rNoL">휴대폰 또는 사업자번호</label><input type="text" id="rNo" class="txt" maxlength="13" inputmode="numeric"></div>
+        <div class="tax"><label class="f" for="rCorp">상호</label><input type="text" id="rCorp" class="txt" maxlength="40"></div>
+        <div class="tax"><label class="f" for="rEmail">계산서 받을 이메일</label><input type="email" id="rEmail" class="txt" maxlength="80"></div>
+      </div>
+      <input type="text" id="hp" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true">
+      <div class="agree">
+        <label><input type="checkbox" id="ag1"> <b>[필수] 개인정보 수집·이용 동의</b></label>
+        <p>수집 항목: 성함, 휴대폰 번호, (선택) 이메일, (증빙을 고르신 경우) 현금영수증 번호 또는 사업자등록번호·상호·이메일 · 목적: 신청 확인, 입금 확인, 보고서 제공, 증빙 발행 · 보유 기간: 거래 완료 후 5년(전자상거래법), 입금하지 않은 신청은 30일 뒤 삭제. 동의하지 않으실 수 있으나 그 경우 신청할 수 없습니다. <a href="/privacy.html" target="_blank">개인정보처리방침</a></p>
+        <label><input type="checkbox" id="ag2"> <b>[필수] 아래 환불·취소 안내를 확인했습니다</b></label>
+      </div>
+      <p class="err" id="oErr"></p>
+      <button type="submit" class="go" id="oGo">신청하고 입금 안내 받기</button>
+    </form>
+    <p class="muted" style="font-size:.85rem;margin:10px 0 0">이미 신청하셨나요? <a href="/order">신청 확인 · 보고서 보기 ›</a></p>
     <details style="margin-top:14px"><summary style="cursor:pointer;font-weight:700">환불·취소 안내</summary>
       <ul style="margin:8px 0 0;padding-left:20px;font-size:.92rem">
-        <li>리포트 제작을 시작하기 전에는 전액 환불해 드립니다.</li>
-        <li>리포트는 디지털 콘텐츠로, PDF를 보내 드린 뒤에는 「전자상거래 등에서의 소비자보호에 관한 법률」 제17조에 따라 청약철회가 제한됩니다. 이를 위해 위 견본을 미리 보실 수 있게 해 드립니다.</li>
-        <li>리포트에 사실과 다른 내용(데이터 처리 오류 등)이 있으면 바로잡아 다시 보내 드리거나 환불해 드립니다.</li>
+        <li>보고서가 발행되기 전에는 전액 환불해 드립니다. 031-818-6336 또는 moongoldenj@naver.com으로 연락 주세요.</li>
+        <li>보고서는 디지털 콘텐츠로, 발행된 뒤에는 「전자상거래 등에서의 소비자보호에 관한 법률」 제17조에 따라 청약철회가 제한됩니다. 이를 위해 견본을 미리 보실 수 있게 해 드립니다.</li>
+        <li>보고서에 사실과 다른 내용(데이터 처리 오류 등)이 있으면 바로잡아 다시 발행하거나 환불해 드립니다.</li>
       </ul></details>
     <p class="muted" style="font-size:.85rem;margin:10px 0 0">리포트는 공공데이터를 바탕으로 한 참고 자료이며, 수익을 보장하거나 특정 기관을 평가·추천하지 않습니다.</p>
   </section>
@@ -254,7 +309,7 @@ async function run() {
     if (["11", "28", "41"].includes(sido)) h += `<div class="note" style="background:var(--main-soft)">자리를 알아보고 계신가요? 같은 회사(주식회사 벤투런)가 운영하는 <b>좋은목</b>에서 ${esc(sidoNm)}의 상가·사무실 매물과 동네 분석을 보실 수 있습니다.
       <a class="btn" style="margin-top:8px" href="https://www.goodmok.co.kr/" target="_blank" rel="noopener">좋은목에서 매물 보기 ›</a></div>`;
     $("#res").innerHTML = h;
-    $("#mail").href = `mailto:moongoldenj@naver.com?subject=${encodeURIComponent(`케어온길 지역 리포트 신청 — ${place} ${j.kind_nm}`)}&body=${encodeURIComponent(`지역: ${place}\n기관 종류: ${j.kind_nm}\n원하시는 리포트: 기본 / 상세\n성함·연락처: \n`)}`;
+    oPrefill(sido, sgg, kind);
     if (stay && avg(o)) { $("#sCap").value = Math.round(avg(o)); if (o.occ != null) $("#sOcc").value = Math.round(o.occ); $("#sKind").value = kind === "daycare" ? "day" : kind; $("#sDays").value = kind === "daycare" ? 22 : 30; sim(); }
   } catch (e) { $("#res").innerHTML = `<p class="note">${esc(e.message)}</p>`; }
 }
@@ -277,12 +332,57 @@ function sim() {
 $("#sKind").addEventListener("change", () => { $("#sDays").value = $("#sKind").value === "day" ? 22 : 30; sim(); });
 sim();
 
+// ---------- 리포트 신청서 ----------
+function oDrawSgg() {
+  const s = regions.find((x) => x.cd === $("#oSido").value);
+  $("#oSgg").innerHTML = s ? `<option value="">시·군·구 선택</option>` + s.sggs.map((g) => `<option value="${g.cd}">${esc(g.nm)}</option>`).join("") : `<option value="">시·도를 먼저 골라 주세요</option>`;
+}
+function oPrefill(sido, sgg, kind) {
+  if (!sido) return;
+  $("#oSido").value = sido; oDrawSgg(); if (sgg) $("#oSgg").value = sgg;
+  if (STAY.has(kind)) $("#oKind").value = kind;
+  oToggle();
+}
+function oToggle() {
+  const custom = document.querySelector('input[name=product]:checked').value === "custom";
+  $("#cust").hidden = !custom; $("#stepN").textContent = custom ? "④" : "③";
+  $("#cDaysW").hidden = $("#oKind").value !== "daycare";
+  const rc = document.querySelector('input[name=rc]:checked').value;
+  $("#rcF").hidden = rc === "none";
+  document.querySelectorAll("#rcF .tax").forEach((el) => (el.hidden = rc !== "tax"));
+  $("#rNoL").textContent = rc === "tax" ? "사업자등록번호" : "휴대폰 또는 사업자번호";
+}
+$("#oSido").addEventListener("change", oDrawSgg);
+document.querySelectorAll('input[name=product],input[name=rc]').forEach((el) => el.addEventListener("change", oToggle));
+$("#oKind").addEventListener("change", oToggle);
+$("#of").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const v = (id) => $(id).value.trim(), err = (m) => { $("#oErr").textContent = m; return false; };
+  const product = document.querySelector('input[name=product]:checked').value, rc = document.querySelector('input[name=rc]:checked').value;
+  if (!v("#oSgg")) return err("시·군·구까지 골라 주세요");
+  if (product === "custom" && (!v("#cCap") || v("#cRent") === "")) return err("맞춤형은 정원과 월 임대료를 꼭 적어 주세요");
+  if (!v("#oName") || !v("#oPhone")) return err("성함과 휴대폰 번호를 적어 주세요");
+  if (!$("#ag1").checked || !$("#ag2").checked) return err("필수 항목 두 가지에 동의해 주세요");
+  $("#oGo").disabled = true; $("#oGo").textContent = "신청하는 중…"; $("#oErr").textContent = "";
+  try {
+    const body = { product, sido: v("#oSido"), sgg: v("#oSgg"), kind: v("#oKind"), name: v("#oName"), phone: v("#oPhone"), email: v("#oEmail"), hp: v("#hp"),
+      agree: true, agreeRefund: true, receipt: { type: rc, no: v("#rNo"), corp: v("#rCorp"), email: v("#rEmail") },
+      inputs: product === "custom" ? { cap: v("#cCap"), rent: v("#cRent"), labor: v("#cLabor"), other: v("#cOther"), invest: v("#cInvest"), deposit: v("#cDeposit"), days: v("#cDays"), addr: v("#cAddr") } : {} };
+    const r = await fetch("/api/order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.t) throw new Error(j.오류 || "신청하지 못했습니다. 잠시 뒤 다시 해 주세요");
+    location.href = "/order?t=" + encodeURIComponent(j.t);
+  } catch (er) { err(er.message); $("#oGo").disabled = false; $("#oGo").textContent = "신청하고 입금 안내 받기"; }
+});
+
 document.addEventListener("click", (e) => { if (e.target.closest("[data-info]")) $("#info").showModal(); });
 $("#infoClose").addEventListener("click", () => $("#info").close());
 (async function init() {
   try {
     regions = (await api({ mode: "regions" })).sidos;
     $("#sido").innerHTML = `<option value="">시·도 선택</option>` + regions.map((s) => `<option value="${s.cd}">${esc(s.nm)}</option>`).join("");
+    $("#oSido").innerHTML = `<option value="">시·도 선택</option>` + regions.map((s) => `<option value="${s.cd}">${esc(s.nm)}</option>`).join("");
+    oToggle();
     const u = new URLSearchParams(location.search);
     if (u.get("sido")) { $("#sido").value = u.get("sido"); drawSgg(); $("#sgg").value = u.get("sgg") || ""; }
     if (u.get("kind") && [...$("#kind").options].some((o) => o.value === u.get("kind"))) $("#kind").value = u.get("kind");

@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>케어온길 지역 리포트</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<style>
+:root{--bg:#f7f4ee;--card:#fff;--ink:#1f2a24;--sub:#5d6a62;--line:#e4ded2;--main:#2f6b4f;--main-soft:#e6f0ea;--warm:#c8762f;--warm-soft:#fbefe2;--grey:#c9c3b6}
+*{box-sizing:border-box}
+html{font-size:16px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;line-height:1.6;word-break:keep-all}
+.wrap{max-width:900px;margin:0 auto;padding:0 16px}
+.bar{position:sticky;top:0;z-index:5;background:#24473a;color:#fff;padding:10px 0}
+.bar .wrap{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.bar a,.bar button{color:#fff;font:inherit;font-size:.9rem}
+.bar button{background:#f5a35c;border:0;border-radius:10px;padding:7px 12px;font-weight:700;cursor:pointer;color:#1f2a24}
+.doc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px 26px;margin:18px 0 40px}
+h1{font-size:1.5rem;margin:0 0 4px;line-height:1.35}
+h2{font-size:1.2rem;margin:34px 0 10px;padding-top:14px;border-top:2px solid var(--main-soft)}
+h3{font-size:1rem;margin:20px 0 6px}
+.meta{color:var(--sub);font-size:.9rem}
+.lead{background:var(--main-soft);border-radius:12px;padding:14px 16px;margin:16px 0}
+.lead li{margin:4px 0}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0}
+@media (max-width:640px){.kpis{grid-template-columns:repeat(2,1fr)}.doc{padding:20px 14px}}
+.kpi{background:#f6f3ec;border-radius:10px;padding:10px 12px}
+.kpi small{color:var(--sub);display:block;font-size:.8rem}
+.kpi b{font-size:1.25rem}
+.kpi span{display:block;font-size:.78rem;color:var(--sub)}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.88rem;margin:8px 0}
+th,td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--sub);font-weight:600;font-size:.8rem;background:#faf8f3}
+td.l,th.l{text-align:left;white-space:normal}
+tr.me td{background:#fff7e0;font-weight:700}
+.note{background:var(--warm-soft);border-radius:10px;padding:10px 12px;font-size:.86rem;margin:12px 0}
+.muted{color:var(--sub)}
+.small{font-size:.82rem}
+.neg{color:#b4472f}
+.pos{color:var(--main)}
+.chart{margin:8px 0}
+.yb{display:grid;grid-template-columns:52px 1fr 40px;gap:6px;align-items:center;font-size:.85rem;margin:3px 0}
+.yb i{display:block;height:12px;border-radius:5px;background:var(--grey)}
+.yb i.ac{background:var(--main)}
+.tag{display:inline-block;background:var(--warm);color:#fff;border-radius:999px;padding:1px 9px;font-size:.78rem;font-weight:700;margin-left:6px;vertical-align:middle}
+#msg{padding:60px 0;text-align:center}
+@media print{
+  @page{size:A4;margin:14mm}
+  body{background:#fff;font-size:12px}
+  .bar,.noprint{display:none!important}
+  .doc{border:0;padding:0;margin:0}
+  h2{break-after:avoid}
+  table,.kpis,.chart,.lead{break-inside:avoid}
+  .tbl{overflow:visible}
+}
+</style>
+</head>
+<body>
+<div class="bar noprint"><div class="wrap"><a href="/biz">케어온길 비즈</a><span><a id="back" href="#">신청 확인</a> &nbsp; <button onclick="print()">PDF로 저장 · 인쇄</button></span></div></div>
+<div class="wrap"><div id="msg">보고서를 불러오는 중입니다…</div><article class="doc" id="doc" hidden></article></div>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const n = (x) => (x == null ? "–" : Number(x).toLocaleString("ko-KR"));
+const p = (x) => (x == null ? "–" : x + "%");
+const man = (w) => (w == null ? "–" : (Math.round(w / 10000)).toLocaleString("ko-KR") + "만 원");
+const eok = (w) => (Math.abs(w) >= 1e8 ? (w / 1e8).toFixed(1) + "억 원" : man(w));
+const sgn = (w) => `<span class="${w < 0 ? "neg" : "pos"}">${w < 0 ? "−" : "+"}${man(Math.abs(w))}</span>`;
+const t = new URLSearchParams(location.search).get("t") || "";
+$("#back").href = "/order?t=" + encodeURIComponent(t);
+
+function kpi(label, val, sub) { return `<div class="kpi"><small>${label}</small><b>${val}</b>${sub ? `<span>${sub}</span>` : ""}</div>`; }
+function table(head, rows, cls = "") { return `<div class="tbl"><table class="${cls}"><tr>${head.map((h) => `<th>${h}</th>`).join("")}</tr>${rows.join("")}</table></div>`; }
+
+// 개원 후 누적 손익 꺾은선
+function rampSvg(series, title) {
+  const W = 760, H = 300, L = 70, R = 740, T = 40, B = 250;
+  const all = series.flatMap((s) => s.pts), lo0 = Math.min(0, ...all), hi0 = Math.max(0, ...all), pad = (hi0 - lo0) * 0.12 || 1, lo = lo0 - pad, hi = hi0 + pad * 0.3;
+  const span = hi - lo, x = (m) => L + (m - 1) / 23 * (R - L), y = (v) => T + (hi - v) / span * (B - T);
+  const step = Math.pow(10, Math.floor(Math.log10(span / 4))), nice = [1, 2, 5, 10].map((k) => k * step).find((k) => span / k <= 6);
+  let g = "";
+  for (let v = Math.ceil(lo / nice) * nice; v <= hi; v += nice) g += `<line x1="${L}" x2="${R}" y1="${y(v)}" y2="${y(v)}" stroke="${v === 0 ? "#8a8a8a" : "#e4ded2"}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="#5d6a62">${v === 0 ? "0" : (v / 1e8).toFixed(1) + "억"}</text>`;
+  [1, 6, 12, 18, 24].forEach((m) => (g += `<text x="${x(m)}" y="${B + 18}" text-anchor="middle" font-size="11" fill="#5d6a62">${m}개월</text>`));
+  const col = ["#2f6b4f", "#b3ad9f"];
+  series.forEach((s, i) => {
+    g += `<path d="${s.pts.map((v, k) => `${k ? "L" : "M"}${x(k + 1)},${y(v)}`).join("")}" fill="none" stroke="${col[i]}" stroke-width="${i ? 2.5 : 3}"/>`;
+    g += `<circle cx="${x(s.minM)}" cy="${y(s.min)}" r="4" fill="${col[i]}"/><text x="${x(s.minM) + (i ? 0 : 8)}" y="${y(s.min) + (i ? -10 : 20)}" text-anchor="${i ? "middle" : "start"}" font-size="11" font-weight="700" fill="${col[i]}">최저 ${s.min < 0 ? "−" : ""}${eok(Math.abs(s.min))} (${s.minM}개월)</text>`;
+  });
+  g += `<rect x="${L}" y="12" width="14" height="4" fill="${col[0]}"/><text x="${L + 20}" y="18" font-size="11">매달 ${series[0].step}%p씩 참</text><rect x="${L + 160}" y="12" width="14" height="4" fill="${col[1]}"/><text x="${L + 180}" y="18" font-size="11">매달 ${series[1].step}%p씩 참</text>`;
+  return `<div class="chart"><b style="font-size:.95rem">${esc(title)}</b><svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(title)}">${g}</svg></div>`;
+}
+function rampText(series) {
+  const [s, f] = series;
+  const pb = (x) => (x.payback ? `${x.payback}개월째에 누적 흑자로 돌아섭니다` : "24개월 안에는 누적 적자를 회수하지 못합니다");
+  return `<p>개원 첫 달 이용률 30%에서 시작해 <b>매달 ${s.step}%p씩</b> 차면 ${s.minM}개월째에 누적 적자가 가장 크고(<b>약 ${eok(Math.abs(Math.min(0, s.min)))}</b>), ${pb(s)}. 매달 ${f.step}%p씩 빠르게 차면 최저점은 약 ${eok(Math.abs(Math.min(0, f.min)))}이고 ${pb(f)}. 이 최저점이 개원 후 버텨야 할 <b>운영자금</b>입니다.</p>`;
+}
+function plTable(pl) {
+  return table(["이용률", "월 매출", "월 고정비", "월 손익"], pl.rows.map((r) => `<tr><td>${r.occ}%</td><td>${man(r.rev)}</td><td>${man(pl.fixed)}</td><td>${sgn(r.profit)}</td></tr>`));
+}
+function hist(h) { return h && h.length ? esc(h.join("→")) : "–"; }
+
+function render(R) {
+  const S = R.sgg, D = R.sido, place = `${R.region.sido_nm} ${R.region.sgg_nm}`, stay = true, full = R.product !== "basic";
+  document.title = `${R.product_nm} — ${place} · ${R.kind_nm} | 케어온길`;
+  let h = `<p class="meta">케어온길 지역 리포트 · ${esc(R.product_nm)}<span class="tag">신청번호 ${esc(R.no)}</span></p>
+    <h1>${esc(place)} · ${esc(R.kind_nm)}</h1>
+    <p class="meta">발행 ${new Date(R.made_at).toLocaleDateString("ko-KR")} · 기관 자료 국민건강보험공단 공개 정보 · 인구 행정안전부 주민등록인구(${esc(R.popYm || "")})</p>`;
+
+  // 한눈에 보기
+  const lead = [];
+  if (R.signal) lead.push(...R.signal);
+  if (S.wait) lead.push(`대기 인원은 ${n(S.wait)}명입니다. ${R.byGrade.find((g) => g.label === "A등급")?.wait ? `그중 A등급 기관에 ${n(R.byGrade.find((g) => g.label === "A등급").wait)}명이 몰려 있습니다.` : ""}`);
+  else lead.push("신고된 대기 인원은 없습니다.");
+  if (R.newOcc && R.newOcc.n) lead.push(`최근 3년 안에 지정되어 아직 평가를 받지 않은 기관 ${n(R.newOcc.n)}곳의 이용률은 ${p(R.newOcc.occ)}입니다. 새 기관이 자리를 채우는 속도를 가늠하는 숫자입니다.`);
+  if (R.outlook?.sgg) { const a = R.outlook.sgg.a80, b = R.outlook.sido?.a80; lead.push(`5년 뒤 80세 이상 인구는 약 ${a.pct > 0 ? "+" : ""}${a.pct}% 바뀔 것으로 보입니다${b ? ` (시·도 ${b.pct > 0 ? "+" : ""}${b.pct}%)` : ""}.`); }
+  if (R.custom) lead.push(`의뢰 조건의 손익분기 이용률은 <b>${R.custom.pl.be}%</b>입니다. 이 지역 평균 이용률(${p(S.occ)})${R.newOcc?.occ != null ? `, 신규 기관 평균(${p(R.newOcc.occ)})` : ""}과 비교해 보세요.`);
+  h += `<div class="lead"><b>한눈에 보기</b><ul style="margin:6px 0 0;padding-left:20px">${lead.map((x) => `<li>${x}</li>`).join("")}</ul></div>`;
+
+  // 1. 수요
+  h += `<h2>1. 고령 인구 (수요)</h2>`;
+  if (S.pop) h += `<div class="kpis">${kpi("65세 이상", n(S.pop.p65) + "명", `고령화율 ${S.pop.aged}% · 시·도 ${D.pop?.aged ?? "–"}%`)}${kpi("75세 이상", n(S.pop.p75) + "명")}${kpi("80세 이상", n(S.pop.p80) + "명", `85세 이상 ${n(S.pop.p85)}명`)}</div>`;
+  if (R.outlook?.sgg) {
+    const o = R.outlook.sgg, d = R.outlook.sido;
+    h += `<h3>5년 뒤 고령 인구 전망</h3>` + table(["구분", "지금", "5년 뒤(추정)", "증가율", "시·도 증가율"], [["75세 이상", "a75"], ["80세 이상", "a80"], ["85세 이상", "a85"]].map(([l, k]) => `<tr><td>${l}</td><td>${n(o[k].now)}명</td><td>${n(o[k].fut)}명</td><td>${o[k].pct > 0 ? "+" : ""}${o[k].pct}%</td><td>${d ? (d[k].pct > 0 ? "+" : "") + d[k].pct + "%" : "–"}</td></tr>`));
+    if (R.outlook.cap && o.a80.now) { const now = (R.outlook.cap / o.a80.now * 1000).toFixed(1), fut = (R.outlook.cap / o.a80.fut * 1000).toFixed(1); h += `<p>새 정원이 하나도 늘지 않는다고 하면, 80세 이상 1,000명당 정원은 <b>${now}석에서 약 ${fut}석</b>으로 바뀝니다.</p>`; }
+    h += `<p class="muted small">지금 사는 분들의 나이를 5년 뒤로 옮기고 나이대별 5년 생존율(통계청 생명표 수준)을 곱한 추정입니다. 전입·전출은 넣지 않았습니다.</p>`;
+  }
+
+  // 2. 공급
+  h += `<h2>2. 기관 현황 (공급)</h2><div class="kpis">${kpi("기관 수", n(S.n) + "곳", `시·도 ${n(D.n)}곳`)}${kpi("총 정원", n(S.capacity) + "명")}${kpi("이용률", p(S.occ), `시·도 평균 ${p(D.occ)}`)}${kpi("남는 자리(추정)", n(S.vacancy) + "석")}${kpi("대기 인원", n(S.wait) + "명")}${kpi("80세 이상 1,000명당 정원", (S.capPer1k80 ?? "–") + "석", `시·도 평균 ${D.capPer1k80 ?? "–"}석`)}</div>`;
+  h += `<h3>${esc(R.region.sido_nm)} 시·군·구 비교 (이용률 높은 순)</h3>` + table(["시·군·구", "기관", "정원", "이용률", "대기", "신규(3년)", "80세+ 인구", "80세+ 천명당 정원"], R.sggs.map((x) => `<tr class="${x.me ? "me" : ""}"><td>${esc(x.nm)}</td><td>${n(x.n)}</td><td>${n(x.capacity)}</td><td>${p(x.occ)}</td><td>${n(x.wait)}</td><td>${n(x.new3y)}</td><td>${n(x.p80)}</td><td>${x.capPer1k80 ?? "–"}</td></tr>`));
+  h += `<h3>규모별</h3>` + table(["정원 규모", "기관", "정원", "이용률", "대기"], R.bySize.map((x) => `<tr><td>${x.label}</td><td>${n(x.n)}곳</td><td>${n(x.cap)}</td><td>${p(x.occ)}</td><td>${n(x.wait)}</td></tr>`));
+  h += `<h3>평가 등급별 (공단 최근 평가)</h3>` + table(["등급", "기관", "정원", "이용률", "대기"], R.byGrade.map((x) => `<tr><td>${x.label}</td><td>${n(x.n)}곳</td><td>${n(x.cap)}</td><td>${p(x.occ)}</td><td>${n(x.wait)}</td></tr>`));
+  const mx = Math.max(1, ...R.newByYear.map((x) => x.n));
+  h += `<h3>해마다 새로 지정된 기관 (지금 운영 중인 곳 기준)</h3><div class="chart">${R.newByYear.map((x, i) => `<div class="yb"><span>${x.y}</span><i class="${i === R.newByYear.length - 1 ? "ac" : ""}" style="width:${x.n / mx * 100}%"></i><span>${x.n}곳</span></div>`).join("")}</div>`;
+
+  // 3. 경쟁 기관
+  if (full) {
+    h += `<h2>3. 기관 전체 목록 (${n(R.list.length)}곳, 정원 큰 순)</h2>` + table(["#", "기관", "지정", "정원", "현원", "이용률", "대기", "요양보호사", "평가 이력(→최근)"], R.list.map((r, i) => `<tr><td>${i + 1}</td><td class="l">${esc(r.name)}</td><td>${r.y ?? "–"}</td><td>${n(r.cap)}</td><td>${n(r.now)}</td><td>${p(r.occ)}</td><td>${n(r.wait)}</td><td>${n(r.cw)}</td><td>${hist(r.hist)}</td></tr>`));
+  } else {
+    h += `<h2>3. 정원 상위 10곳</h2>` + table(["기관", "지정", "정원", "현원", "이용률", "대기", "평가"], R.top.map((r) => `<tr><td class="l">${esc(r.name)}</td><td>${r.y ?? "–"}</td><td>${n(r.cap)}</td><td>${n(r.now)}</td><td>${p(r.occ)}</td><td>${n(r.wait)}</td><td>${r.grade || "–"}</td></tr>`));
+  }
+  h += `<p class="muted small">정원·현원·대기는 기관이 공단에 신고한 값이라 실제와 다를 수 있습니다.</p>`;
+
+  // 4. 운영 비교
+  h += `<h2>4. 운영 비교 (중간값)</h2><div class="kpis">${kpi("정원 10명당 요양보호사", R.ops.cwPer10 != null ? R.ops.cwPer10 + "명" : "–", `${n(R.ops.n)}곳 기준`)}${kpi("1식 식재료비", R.ops.foodMed != null ? n(R.ops.foodMed) + "원" : "–", "비급여 신고 기준")}${R.ops.rooms ? kpi("침실 구성", Object.entries(R.ops.rooms).map(([k, v]) => `${k.replace("인실", "")}인 ${n(v)}`).join(" · "), "실 수 합계") : ""}</div>`;
+
+  // 5. 손익
+  const A = R.plStd.assume;
+  h += `<h2>5. 표준 가정 손익</h2><p>이 지역에 같은 종류의 기관을 열 때 정원별로 손익이 어떻게 되는지 표준 가정으로 계산했습니다.</p>`;
+  h += table(["정원", "1명당 월 매출", "월 고정비", "손익분기 이용률", "이용률 80% 손익", "이용률 95% 손익"], R.plStd.rows.map((r) => `<tr><td>${r.cap}인</td><td>${man(r.perUser.month)}</td><td>${man(r.fixed)}</td><td><b>${r.be}%</b></td><td>${sgn(r.rows[1].profit)}</td><td>${sgn(r.rows[3].profit)}</td></tr>`));
+  h += `<p class="muted small">가정: 2026년 수가, 이용자 등급 구성 ${Object.entries(A.mix).map(([g, w]) => `${g}등급 ${Math.round(w * 100)}%`).join(" · ")}, 월 ${A.days}일 이용, 인건비 = 이용률 95% 매출의 ${Math.round(A.laborRatio * 100)}%, 임차 면적 정원 1명당 ${A.areaPy}평 × 평당 월 3만 원, 기타 운영비 정원 1명당 월 ${man(A.otherPerCap)}. 식재료비 등 비급여 수입과 가산·감산은 넣지 않았습니다.</p>`;
+  if (R.rampStd) h += `<h3>개원 후 운영자금 (정원 ${R.rampStd.cap}인, 표준 가정)</h3>` + rampSvg(R.rampStd.series, `정원 ${R.rampStd.cap}인 · 개원 후 누적 손익`) + rampText(R.rampStd.series);
+
+  // 6. 맞춤형
+  if (R.custom) {
+    const C = R.custom, I = C.inputs, pl = C.pl;
+    h += `<h2>6. 의뢰 조건 맞춤 분석</h2>` + table(["항목", "조건"], [
+      `<tr><td>정원</td><td>${I.cap}인</td></tr>`, `<tr><td>월 임대료</td><td>${man(I.rent)}</td></tr>`,
+      `<tr><td>월 인건비</td><td>${man(I.labor)}${I.laborGiven ? "" : " (적지 않으셔서 표준 가정 적용)"}</td></tr>`,
+      `<tr><td>기타 운영비</td><td>${man(I.other)}${I.otherGiven ? "" : " (표준 가정)"}</td></tr>`,
+      I.invest ? `<tr><td>초기 투자(인테리어·장비 등)</td><td>${man(I.invest)}</td></tr>` : "", I.deposit ? `<tr><td>보증금</td><td>${man(I.deposit)} (회수되는 돈이라 손익에는 넣지 않음)</td></tr>` : "",
+      R.kind === "daycare" ? `<tr><td>월 이용일</td><td>${I.days}일</td></tr>` : "", I.addr ? `<tr><td>예정지</td><td>${esc(I.addr)}</td></tr>` : ""].filter(Boolean));
+    h += `<h3>월 손익</h3><p>이용자 1명당 월 매출은 약 ${man(pl.perUser.month)}, 매달 고정비는 ${man(pl.fixed)}입니다. <b>손익분기 이용률은 ${pl.be}%</b>(약 ${Math.ceil(pl.cap * pl.be / 100)}명)입니다.</p>` + plTable(pl);
+    h += `<h3>개원 후 운영자금${I.invest ? " (초기 투자 포함)" : ""}</h3>` + rampSvg(C.ramp, `정원 ${I.cap}인 · 개원 후 누적 손익`) + rampText(C.ramp);
+    h += `<h3>조건이 바뀌면 (손익분기 이용률)</h3>` + table(["인건비 \\ 임대료", "임대료 −20%", "지금 조건", "임대료 +20%"], C.sens.map((r) => `<tr><td>인건비 ${r.dl ? (r.dl > 0 ? "+" : "−") + Math.abs(r.dl * 100) + "%" : "지금 조건"}</td>${r.cells.map((c, i) => `<td>${r.dl === 0 && i === 1 ? `<b>${c}%</b>` : c + "%"}</td>`).join("")}</tr>`));
+    h += `<h3>요양보호사 인력 점검</h3><p>정원 ${I.cap}인이면 요양보호사는 법정 기준(이용자 ${C.staff.ratio}명당 1명)으로 <b>최소 ${C.staff.minCw}명</b>이 필요합니다. 1명 월 ${man(C.staff.wage)}(급여·4대보험·퇴직금 포함 가정)이면 요양보호사 인건비만 약 ${man(C.staff.minCost)}로, 적어 주신 월 인건비의 ${C.staff.share ?? "–"}%입니다.${C.staff.share > 75 ? " <b>시설장·사회복지사·간호(조무)사·조리원 등 다른 직원 인건비가 빠듯할 수 있습니다.</b>" : ""}</p><p class="muted small">인력 배치 기준은 기관 종류·정원 구간·치매전담실 여부에 따라 다르고 바뀔 수 있으니, 지정 신청 전에 관할 시·군·구에서 최신 기준을 꼭 확인하세요.</p>`;
+    if (C.near) {
+      const N = C.near;
+      h += `<h3>예정지 반경 경쟁 기관</h3><p class="muted small">예정지: ${esc(N.addr)} · 직선거리 기준</p>` + table(["반경", "기관", "정원", "이용률", "대기"], N.rings.map((r) => `<tr><td>${r.k}km 안</td><td>${n(r.n)}곳</td><td>${n(r.cap)}</td><td>${p(r.occ)}</td><td>${n(r.wait)}</td></tr>`));
+      if (N.list.length) h += table(["가까운 순", "거리", "지정", "정원", "이용률", "대기", "평가"], N.list.map((r) => `<tr><td class="l">${esc(r.name)}</td><td>${r.d}km</td><td>${r.y ?? "–"}</td><td>${n(r.cap)}</td><td>${p(r.occ)}</td><td>${n(r.wait)}</td><td>${r.grade || "–"}</td></tr>`));
+      if (N.missing) h += `<p class="muted small">주소로 위치를 찾지 못한 기관 ${n(N.missing)}곳은 반경 계산에서 빠졌습니다.</p>`;
+    } else if (C.nearErr || I.addr) h += `<p class="note">예정지 주소로 위치를 찾지 못해 반경 분석을 넣지 못했습니다. 주소를 알려 주시면 다시 만들어 드립니다.</p>`;
+  }
+
+  h += `<h2>읽을 때 참고하실 점</h2><ul class="small">
+    <li>이 보고서는 국민건강보험공단 장기요양기관 공개 정보와 행정안전부 주민등록인구를 케어온길이 모아 계산한 참고 자료입니다.</li>
+    <li>요양시설은 자녀 집 근처로 고르는 경우가 많아, 어르신 주소지 인구와 실제 이용 지역은 다를 수 있습니다.</li>
+    <li>손익은 가정에 따라 크게 달라지는 모의계산이며 수익을 보장하지 않습니다. 창업 판단은 현장 조사, 관할 지자체 지정 기준 확인, 전문가 상담과 함께 하시길 권해 드립니다.</li>
+    <li>케어온길은 특정 지역이나 기관을 추천하거나 평가하지 않습니다.</li></ul>
+    <p class="meta small">주식회사 벤투런 · 케어온길 비즈 · www.careongil.kr/biz · moongoldenj@naver.com</p>`;
+  $("#doc").innerHTML = h; $("#doc").hidden = false; $("#msg").hidden = true;
+}
+(async () => {
+  try {
+    const r = await fetch("/api/order?report=1&t=" + encodeURIComponent(t));
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.오류 || "보고서를 불러오지 못했습니다");
+    render(j);
+  } catch (e) { $("#msg").innerHTML = `${esc(e.message)}<br><a href="/order?t=${encodeURIComponent(t)}">신청 확인 페이지로</a>`; }
+})();
+</script>
+</body>
+</html>

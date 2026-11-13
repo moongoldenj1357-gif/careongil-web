@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>리포트 신청 확인 | 케어온길 비즈</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<style>
+:root{--bg:#f7f4ee;--card:#fff;--ink:#1f2a24;--sub:#5d6a62;--line:#e4ded2;--main:#2f6b4f;--main-soft:#e6f0ea;--warm:#c8762f;--warm-soft:#fbefe2}
+*{box-sizing:border-box}
+html{font-size:17px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;line-height:1.6;word-break:keep-all}
+.wrap{max-width:620px;margin:0 auto;padding:0 16px}
+header{background:#24473a;color:#fff;padding:18px 0}
+header a{color:#fff}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin:16px 0}
+h1{font-size:1.25rem;margin:0 0 8px}
+.muted{color:var(--sub)}
+label{display:block;font-size:.85rem;color:var(--sub);margin:10px 0 4px}
+input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font:inherit}
+.btn{display:block;width:100%;text-align:center;border:0;border-radius:12px;background:var(--main);color:#fff;font-weight:700;padding:13px;margin-top:14px;cursor:pointer;font:inherit;font-weight:700;text-decoration:none}
+.btn.sub{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.steps{display:flex;gap:6px;margin:14px 0}
+.steps div{flex:1;text-align:center;font-size:.82rem;padding:8px 4px;border-radius:10px;background:#efebe2;color:var(--sub)}
+.steps div.on{background:var(--main);color:#fff;font-weight:700}
+.pay{background:var(--warm-soft);border-radius:12px;padding:14px;margin-top:10px}
+.pay b{font-size:1.1rem}
+.row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:.95rem}
+.row span:first-child{color:var(--sub)}
+.copy{border:1px solid var(--line);background:#fff;border-radius:8px;padding:2px 8px;font-size:.8rem;cursor:pointer;margin-left:6px}
+.err{color:#b4472f}
+</style>
+</head>
+<body>
+<header><div class="wrap"><a href="/biz">← 케어온길 비즈</a></div></header>
+<main class="wrap" id="app"><div class="card">불러오는 중…</div></main>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const won = (n) => Number(n).toLocaleString("ko-KR") + "원";
+const t = new URLSearchParams(location.search).get("t");
+let timer;
+
+function lookupForm(msg = "") {
+  $("#app").innerHTML = `<div class="card"><h1>리포트 신청 확인</h1><p class="muted">신청하실 때 받으신 신청번호와 휴대폰 번호를 넣어 주세요.</p>
+    <label for="no">신청번호 (예: 2611-1234)</label><input id="no" inputmode="numeric" autocomplete="off" placeholder="0000-0000">
+    <label for="ph">휴대폰 번호</label><input id="ph" inputmode="tel" autocomplete="tel" placeholder="010-0000-0000">
+    <p class="err" id="e">${esc(msg)}</p><button class="btn" id="go">확인하기</button></div>`;
+  $("#go").onclick = async () => {
+    const r = await fetch("/api/order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ find: { no: $("#no").value.trim(), phone: $("#ph").value } }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return ($("#e").textContent = j.오류 || "찾지 못했습니다");
+    location.href = "/order?t=" + encodeURIComponent(j.t);
+  };
+}
+async function load() {
+  const r = await fetch("/api/order?t=" + encodeURIComponent(t));
+  const o = await r.json().catch(() => ({}));
+  if (!r.ok) return lookupForm(o.오류 || "신청을 찾지 못했습니다");
+  const st = o.status, done = st === "done";
+  let h = `<div class="card"><h1>${esc(o.product_nm)} 신청 확인</h1>
+    <div class="row"><span>신청번호</span><b>${esc(o.no)}</b></div>
+    <div class="row"><span>지역 · 종류</span><span>${esc(o.region_nm)} · ${esc(o.kind_nm)}</span></div>
+    <div class="row"><span>신청자</span><span>${esc(o.name)}</span></div>
+    <div class="row"><span>신청일</span><span>${new Date(o.created_at).toLocaleString("ko-KR")}</span></div>
+    <div class="steps"><div class="on">① 신청 접수</div><div class="${st === "requested" ? "on" : ""}">② 입금 확인 중</div><div class="${done ? "on" : ""}">③ 발행 완료</div></div>`;
+  if (st === "canceled") h += `<p class="err">이 신청은 취소되었습니다. 궁금하신 점은 031-818-6336으로 연락 주세요.</p>`;
+  else if (done) h += `<p><b>보고서가 발행되었습니다.</b> 아래 버튼으로 보시고, 'PDF로 저장'을 누르시면 파일로 보관하실 수 있습니다.</p><a class="btn" href="/report?t=${encodeURIComponent(t)}">📄 보고서 보기</a>`;
+  else h += `<div class="pay"><p style="margin:0 0 8px">아래 계좌로 입금해 주시면, 확인하는 대로 보고서가 바로 발행됩니다. (평일 오전 9시~오후 9시에는 보통 30분 안)</p>
+    <div class="row"><span>입금 계좌</span><span>${esc(o.bank || "계좌 안내 준비 중")}${o.bank ? `<button class="copy" data-c="${esc(o.bank.match(/[\d-]{8,}/)?.[0] || o.bank)}">복사</button>` : ""}</span></div>
+    <div class="row"><span>입금하실 금액</span><b>${won(o.amount)}</b></div>
+    <div class="row"><span>입금자명</span><span><b>${esc(o.depositor)}</b><button class="copy" data-c="${esc(o.depositor)}">복사</button></span></div>
+    <p class="muted" style="font-size:.85rem;margin:8px 0 0">입금자명을 꼭 위와 같이 적어 주세요. 이름 뒤 숫자 4자리로 신청을 찾습니다.</p></div>
+    <p class="muted" style="font-size:.85rem">이 화면은 1분마다 저절로 새로 고쳐집니다. <b>지금 주소를 즐겨찾기</b> 해 두시거나, 나중에 <a href="/order">신청 확인</a>에서 신청번호와 휴대폰 번호로 다시 들어오실 수 있습니다.</p>`;
+  h += `</div><p class="muted" style="font-size:.82rem">문의: 주식회사 벤투런 · 031-818-6336 · moongoldenj@naver.com</p>`;
+  $("#app").innerHTML = h;
+  clearTimeout(timer);
+  if (st === "requested") timer = setTimeout(load, 60000);
+}
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest(".copy"); if (!b) return;
+  try { await navigator.clipboard.writeText(b.dataset.c); b.textContent = "복사됨"; } catch { prompt("복사해 주세요", b.dataset.c); }
+});
+t ? load() : lookupForm();
+</script>
+</body>
+</html>

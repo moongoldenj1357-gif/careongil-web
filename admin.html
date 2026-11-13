@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>관리자 | 케어온길 비즈</title>
+<link rel="icon" type="image/png" href="/favicon.png">
+<style>
+:root{--bg:#f7f4ee;--card:#fff;--ink:#1f2a24;--sub:#5d6a62;--line:#e4ded2;--main:#2f6b4f;--warm:#c8762f;--warm-soft:#fbefe2}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;line-height:1.5;font-size:15px}
+.wrap{max-width:980px;margin:0 auto;padding:0 14px}
+header{background:#24473a;color:#fff;padding:14px 0}
+header .wrap{display:flex;justify-content:space-between;align-items:center}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0}
+button{font:inherit;cursor:pointer;border-radius:9px;border:1px solid var(--line);background:#fff;padding:6px 10px}
+button.pri{background:var(--main);border-color:var(--main);color:#fff;font-weight:700}
+button.warn{color:#b4472f}
+.tabs button.on{background:var(--ink);color:#fff}
+.o{border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0;background:#fff}
+.o.new{border:2px solid var(--warm);background:var(--warm-soft)}
+.o h3{margin:0 0 4px;font-size:1rem}
+.chip{display:inline-block;border-radius:999px;padding:1px 9px;font-size:.78rem;font-weight:700;color:#fff;background:#999;margin-left:6px}
+.chip.requested{background:var(--warm)}.chip.done{background:var(--main)}
+.kv{color:var(--sub);font-size:.88rem}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:9px}
+.err{color:#b4472f}
+</style>
+</head>
+<body>
+<header><div class="wrap"><b>케어온길 비즈 · 관리자</b><span id="who"></span></div></header>
+<main class="wrap" id="app"></main>
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const won = (n) => Number(n).toLocaleString("ko-KR") + "원";
+const ST = { requested: "입금 대기", done: "발행 완료", canceled: "취소" };
+let code = sessionStorage.getItem("cog_admin") || "", rows = [], tab = "requested", seen = null, timer;
+
+async function call(method, body) {
+  const r = await fetch("/api/admin" + (method === "GET" ? "?list=1" : ""), { method, headers: { "x-admin-code": code, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 403) { sessionStorage.removeItem("cog_admin"); code = ""; login("관리자 코드가 맞지 않습니다"); throw new Error("403"); }
+  if (!r.ok) throw new Error(j.오류 || "실패");
+  return j;
+}
+function login(msg = "") {
+  $("#app").innerHTML = `<div class="card"><p>관리자 코드를 넣어 주세요. (이 브라우저 창을 닫으면 지워집니다)</p><input id="c" type="password" autocomplete="off"> <button class="pri" id="ok">들어가기</button><p class="err">${esc(msg)}</p></div>`;
+  $("#ok").onclick = () => { code = $("#c").value.trim(); sessionStorage.setItem("cog_admin", code); load(); };
+}
+function inputs(o) {
+  const i = o.inputs || {}; if (o.product !== "custom") return "";
+  const m = (x) => (x == null ? "–" : `${x.toLocaleString("ko-KR")}만`);
+  return `<div class="kv">조건: 정원 ${i.cap ?? "–"}인 · 임대료 ${m(i.rent)} · 인건비 ${m(i.labor)} · 기타 ${m(i.other)} · 초기투자 ${m(i.invest)}${i.days ? ` · 월 ${i.days}일` : ""}${i.addr ? `<br>예정지: ${esc(i.addr)}` : ""}</div>`;
+}
+function receipt(o) {
+  const r = o.receipt || {};
+  if (r.type === "cash") return `현금영수증 ${esc(r.no)}`;
+  if (r.type === "tax") return `세금계산서 ${esc(r.no)}${r.corp ? ` (${esc(r.corp)})` : ""} · ${esc(r.email)}`;
+  return "증빙 필요 없음";
+}
+function draw(kakao) {
+  const list = rows.filter((o) => tab === "all" || o.status === tab);
+  const nReq = rows.filter((o) => o.status === "requested").length;
+  document.title = (nReq ? `(${nReq}) ` : "") + "관리자 | 케어온길 비즈";
+  $("#app").innerHTML = `
+  <div class="card"><b>카카오톡 알림</b> — ${kakao.connected ? `✅ 연결됨${kakao.refreshUntil ? ` (다시 연결 필요 예상: ${kakao.refreshUntil} 무렵)` : ""} <button id="kt">시험 보내기</button> <button id="kc">다시 연결</button>` : `❌ 연결 안 됨 <button class="pri" id="kc">카카오톡 알림 연결하기</button>`}
+    <span class="kv" id="km"></span>
+    <br><span class="kv">브라우저 알림: <button id="bn">이 화면에서 알림 받기</button> (관리자 화면을 열어 두면 1분마다 새 신청을 확인합니다)</span></div>
+  <div class="tabs">${[["requested", `입금 대기 ${nReq}`], ["done", "발행 완료"], ["canceled", "취소"], ["all", "전체"]].map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${l}</button>`).join(" ")} <button id="rf">새로 고침</button></div>
+  ${list.length ? list.map((o) => `<div class="o ${o.status === "requested" ? "new" : ""}">
+    <h3>${esc(o.no)} · ${esc(o.product_nm)} <span class="chip ${o.status}">${ST[o.status]}</span></h3>
+    <div>${esc(o.region_nm)} · ${esc(o.kind_nm)} · <b>${won(o.amount)}</b> · 입금자명 <b>${esc(o.name.replace(/\s/g, "").slice(0, 4) + o.no.slice(-4))}</b></div>
+    <div class="kv">${esc(o.name)} · ${esc(o.phone)}${o.email ? ` · ${esc(o.email)}` : ""} · ${receipt(o)} · 신청 ${new Date(o.created_at).toLocaleString("ko-KR")}${o.done_at ? ` · 발행 ${new Date(o.done_at).toLocaleString("ko-KR")}` : ""}</div>
+    ${inputs(o)}${o.report_err ? `<div class="err">오류: ${esc(o.report_err)}</div>` : ""}
+    <div class="acts">${o.status === "requested" ? `<button class="pri" data-a="approve" data-no="${o.no}">입금 확인 → 보고서 발행</button>` : ""}
+      ${o.status === "done" ? `<a href="/report?t=${encodeURIComponent(o.token)}" target="_blank"><button>보고서 보기</button></a><button data-a="rebuild" data-no="${o.no}">다시 만들기</button>` : ""}
+      <a href="/order?t=${encodeURIComponent(o.token)}" target="_blank"><button>고객 화면</button></a>
+      ${o.status !== "canceled" ? `<button class="warn" data-a="cancel" data-no="${o.no}">취소</button>` : ""}</div></div>`).join("") : `<p class="kv">해당하는 신청이 없습니다.</p>`}`;
+}
+async function load() {
+  if (!code) return login();
+  try {
+    const j = await call("GET");
+    rows = j.rows;
+    const ids = new Set(rows.filter((o) => o.status === "requested").map((o) => o.no));
+    if (seen) { const fresh = [...ids].filter((x) => !seen.has(x)); if (fresh.length && "Notification" in window && Notification.permission === "granted") new Notification("케어온길 새 리포트 신청", { body: `${fresh.length}건이 들어왔습니다` }); }
+    seen = ids;
+    draw(j.kakao);
+  } catch (e) { if (e.message !== "403") $("#app").innerHTML = `<div class="card err">${esc(e.message)}</div>`; }
+  clearTimeout(timer); timer = setTimeout(load, 60000);
+}
+document.addEventListener("click", async (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.tab) { tab = b.dataset.tab; return load(); }
+  if (b.id === "rf") return load();
+  if (b.id === "bn") { if ("Notification" in window) await Notification.requestPermission(); b.textContent = Notification.permission === "granted" ? "켜짐" : "브라우저에서 허용해 주세요"; return; }
+  if (b.id === "kc") { try { location.href = (await call("POST", { action: "kakaoUrl" })).url; } catch (er) { $("#km").textContent = er.message; } return; }
+  if (b.id === "kt") { try { await call("POST", { action: "kakaoTest" }); $("#km").textContent = "보냈습니다. 카톡 '나와의 채팅'을 확인하세요."; } catch (er) { $("#km").textContent = er.message; } return; }
+  const a = b.dataset.a, no = b.dataset.no; if (!a) return;
+  const ask = { approve: `${no} 입금을 확인하셨나요? 보고서를 바로 발행합니다.`, rebuild: `${no} 보고서를 최신 자료로 다시 만들까요?`, cancel: `${no} 신청을 취소할까요?` }[a];
+  if (!confirm(ask)) return;
+  b.disabled = true; b.textContent = a === "cancel" ? "취소 중…" : "보고서 만드는 중… (최대 1분)";
+  try { const j = await call("POST", { action: a, no }); if (j.nearErr) alert("발행은 되었지만 반경 분석을 넣지 못했습니다: " + j.nearErr); load(); }
+  catch (er) { alert(er.message); load(); }
+});
+load();
+</script>
+</body>
+</html>
