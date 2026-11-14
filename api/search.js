@@ -97,15 +97,21 @@ export default async function handler(req, res) {
       }
       const since = new Date(Date.now() - 3 * 365.25 * 864e5).toISOString().slice(0, 10);
       const agg = (list) => {
-        const o = { n: list.length, detail: 0, capacity: 0, now: 0, wait: 0, capN: 0, new3y: 0, grades: { A: 0, B: 0, C: 0, D: 0, E: 0, 없음: 0 } };
+        const o = { n: list.length, detail: 0, capacity: 0, now: 0, wait: 0, capN: 0, new3y: 0, grades: { A: 0, B: 0, C: 0, D: 0, E: 0, 없음: 0 }, gocc: {} };
         for (const r of list) {
           if (r.detail_at) o.detail++;
           const now = sum(r.now_m, r.now_f), wait = sum(r.wait_m, r.wait_f);
           if (r.capacity != null && now != null) { o.capacity += r.capacity; o.now += now; o.capN++; }
           if (wait != null) o.wait += wait;
           if (r.designated && r.designated >= since) o.new3y++;
-          o.grades[/^[A-E]$/.test(r.eval_grade || "") ? r.eval_grade : "없음"]++;
+          const gk = /^[A-E]$/.test(r.eval_grade || "") ? r.eval_grade : "없음";
+          o.grades[gk]++;
+          // 평가 등급별 이용률·대기 (A / B / C~E / 평가 없음)
+          const gb = gk === "없음" ? "none" : /[CDE]/.test(gk) ? "CDE" : gk;
+          const g = (o.gocc[gb] ||= { n: 0, cap: 0, now: 0, wait: 0 });
+          g.n++; if (r.capacity != null && now != null) { g.cap += r.capacity; g.now += now; } if (wait != null) g.wait += wait;
         }
+        for (const g of Object.values(o.gocc)) { g.occ = g.cap ? Math.round((g.now / g.cap) * 1000) / 10 : null; g.waitPer = g.n ? Math.round((g.wait / g.n) * 10) / 10 : null; }
         o.occ = o.capacity ? Math.round((o.now / o.capacity) * 1000) / 10 : null;
         o.vacancy = o.capacity ? Math.max(0, o.capacity - o.now) : null;
         return o;
@@ -129,7 +135,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ sido, sgg, kind, kind_nm: KIND_NM[kind], since, popYm,
         sidoStats: addPop(agg(rows), [...pop.values()]),
         sggStats: sgg ? addPop(agg(bySgg.get(sgg) || []), pop.has(sgg) ? [pop.get(sgg)] : []) : null,
-        sggs: [...bySgg.entries()].map(([cd, l]) => ({ cd, nm: pop.get(cd)?.sgg_nm || null, ...addPop(agg(l), pop.has(cd) ? [pop.get(cd)] : []) })) });
+        sggs: [...bySgg.entries()].map(([cd, l]) => { const { gocc, ...a } = addPop(agg(l), pop.has(cd) ? [pop.get(cd)] : []); return { cd, nm: pop.get(cd)?.sgg_nm || null, ...a }; }) });
     }
 
     // 1-3) 실버타운·양로원 (노인주거복지시설, 보건복지부 현황 + 가격 조사표)
