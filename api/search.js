@@ -20,7 +20,7 @@ const DETAIL_COLS = `${LIST_COLS},addr_detail,post,parking,transport,list_seen,s
 const PAGE = 20;
 // 실버타운·양로원 (silver_facilities 표). 시·도 코드는 lib/ltc.js SIDOS와 같음 (12 = 전남광주통합특별시)
 const SILVER_NM = { housing: "실버타운(노인복지주택)", yangro: "양로원(양로시설)", group: "노인공동생활가정" };
-const SILVER_COLS = "id,kind,sido,sgg,name,addr,tel,capacity,current,staff,units_sale,units_rent,units_mixed_sale,units_mixed_rent,est_date,operator,homepage,price_status,price_deposit,price_source,price_checked_at,src";
+const SILVER_COLS = "id,kind,sido,sgg,name,addr,tel,capacity,current,staff,units_sale,units_rent,units_mixed_sale,units_mixed_rent,est_date,operator,homepage,price_status,price_deposit,price_source,price_checked_at,src,info";
 const SIDO_FULL = { 11: ["서울특별시"], 26: ["부산광역시"], 27: ["대구광역시"], 28: ["인천광역시"], 30: ["대전광역시"], 31: ["울산광역시"], 36: ["세종특별자치시"],
   41: ["경기도"], 43: ["충청북도"], 44: ["충청남도"], 47: ["경상북도"], 48: ["경상남도"], 50: ["제주특별자치도"], 51: ["강원특별자치도", "강원도"], 52: ["전북특별자치도", "전라북도"],
   12: ["전남광주통합특별시", "광주광역시", "전라남도"] };

@@ -6,6 +6,8 @@
 //  POST /api/admin {action:"cancel", no}          → 신청 취소
 //  POST /api/admin {action:"kakaoUrl"}            → 카톡 알림 연결 주소
 //  POST /api/admin {action:"kakaoTest"}           → 카톡 시험 전송
+//  POST /api/admin {action:"silverApprove", id}   → 실버타운 시설이 보낸 정보 승인 → 공개 (silver_facilities.info)
+//  POST /api/admin {action:"silverReject", id}    → 실버타운 시설이 보낸 정보 반려
 //  GET  /api/admin?code=..&state=..               → (카카오가 돌려보내는 주소) 알림 연결 마무리
 import crypto from "node:crypto";
 import { sb, kvGet, kvSet, SB_URL, SB_KEY } from "../lib/db.js";
@@ -38,7 +40,15 @@ export default async function handler(req, res) {
 
     if (req.method === "GET") {
       const rows = await sb("report_orders?select=no,product,amount,status,region_nm,kind,inputs,name,phone,email,receipt,report_err,created_at,done_at,token&order=created_at.desc&limit=200");
-      return res.status(200).json({ rows: rows.map((r) => ({ ...r, product_nm: PRODUCTS[r.product]?.nm, kind_nm: KIND_NM[r.kind] })), kakao: await kakao.status().catch((e) => ({ connected: false, err: e.message })) });
+      // 실버타운 시설이 보낸 정보 (확인 대기)
+      let silver = [];
+      try {
+        const reqs = await sb("silver_info_requests?select=id,sid,info,writer_name,writer_role,writer_contact,created_at&status=eq.pending&order=created_at.asc&limit=50");
+        const ids = [...new Set(reqs.map((r) => r.sid))];
+        const fs = ids.length ? await sb(`silver_facilities?select=id,name,sido,tel,info&id=in.(${ids.join(",")})`) : [];
+        silver = reqs.map((r) => ({ ...r, facility: fs.find((f) => f.id === r.sid) || null }));
+      } catch (e) { silver = { err: e.message }; }
+      return res.status(200).json({ rows: rows.map((r) => ({ ...r, product_nm: PRODUCTS[r.product]?.nm, kind_nm: KIND_NM[r.kind] })), silver, kakao: await kakao.status().catch((e) => ({ connected: false, err: e.message })) });
     }
     if (req.method !== "POST") return res.status(405).end();
     const b = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
@@ -51,6 +61,24 @@ export default async function handler(req, res) {
       return res.status(200).json({ url: kakao.authUrl(state) });
     }
     if (b.action === "kakaoTest") { await kakao.memo("[케어온길] 시험 알림입니다. 잘 받으셨다면 연결이 정상입니다."); return res.status(200).json({ ok: true }); }
+
+    if (b.action === "silverApprove" || b.action === "silverReject") {
+      const id = String(b.id || "");
+      if (!/^\d{1,9}$/.test(id)) return res.status(400).json({ 오류: "요청 번호가 올바르지 않습니다" });
+      const [r] = await sb(`silver_info_requests?select=*&id=eq.${id}`);
+      if (!r || r.status !== "pending") return res.status(404).json({ 오류: "확인을 기다리는 요청이 없습니다" });
+      if (b.action === "silverApprove") {
+        const [f] = await sb(`silver_facilities?select=info&id=eq.${r.sid}`);
+        const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+        // 시설이 적은 항목만 덮어쓰고, 나머지는 기존 내용 유지
+        // 공개 자료로 채운 항목의 출처(src·at)는 그대로 두고, 시설이 보낸 항목만 fac_keys에 적어 둠
+        const old = f?.info || {};
+        const info = { ...old, ...r.info, fac_keys: [...new Set([...(old.fac_keys || []), ...Object.keys(r.info)])], fac_at: today };
+        await sb(`silver_facilities?id=eq.${r.sid}`, { method: "PATCH", body: { info }, prefer: "return=minimal" });
+      }
+      await sb(`silver_info_requests?id=eq.${id}`, { method: "PATCH", body: { status: b.action === "silverApprove" ? "approved" : "rejected", decided_at: new Date().toISOString() }, prefer: "return=minimal" });
+      return res.status(200).json({ ok: true });
+    }
 
     if (!/^\d{4}-\d{4}$/.test(no)) return res.status(400).json({ 오류: "신청번호가 올바르지 않습니다" });
     const [o] = await sb(`report_orders?select=*&no=eq.${no}`);
