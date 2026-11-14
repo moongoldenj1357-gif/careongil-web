@@ -283,6 +283,18 @@ function grades(o) {
   return `<div class="bars"><b style="font-size:.95rem">기관평가 분포</b>${ks.map((k) => `<div class="bar"><span>${k}</span><i class="${k === "없음" ? "none" : ""}" style="width:${(o.grades[k] / max) * 100}%"></i><span>${num(o.grades[k])}곳</span></div>`).join("")}
     <p class="muted" style="font-size:.82rem;margin:4px 0 0">'없음'은 신규 기관 등 아직 평가 결과가 공개되지 않은 곳입니다.</p></div>`;
 }
+// 1식 식재료비 분포 (기관 신고 금액)
+function foodDist(o, base, kind) {
+  const S = base || o, L = base ? o : null;
+  if (!S.food) return "";
+  const won0 = (x) => num(x) + "원", day = kind === "home" || kind === "short";
+  const row = (nm, f) => f && f.n >= 3 ? `<tr><td>${nm}</td><td>${num(f.n)}곳</td><td>${won0(f.p25)}</td><td><b>${won0(f.med)}</b></td><td>${won0(f.p75)}</td>${day ? `<td>${won0(f.med * 3)}</td>` : ""}</tr>`
+    : `<tr><td>${nm}</td><td>${num(f?.n || 0)}곳</td><td colspan="${day ? 4 : 3}" class="muted">신고한 기관이 3곳 미만이라 생략</td></tr>`;
+  return `<h3 style="margin:18px 0 0;font-size:1rem">1식 식재료비 (기관이 공단에 신고한 금액)</h3><div class="tbl"><table>
+    <tr><th></th><th>신고 기관</th><th>하위 25%</th><th>중간값</th><th>상위 25%</th>${day ? "<th>하루 어림 (중간값×3끼)</th>" : ""}</tr>
+    ${L ? row("이 지역", L.food) : ""}${row(base ? "시·도 전체" : "이 지역", S.food)}</table></div>
+    <p class="muted" style="font-size:.82rem;margin:4px 0 0">식재료비는 비급여(전액 본인부담)로 기관이 정해 공단에 신고합니다. 가운데 50% 기관이 하위 25%~상위 25% 사이에 있습니다. 가격을 정하실 때 지역 수준을 가늠하는 참고용이며, 식단·간식 포함 여부에 따라 다릅니다.</p>`;
+}
 // 평가 등급별 이용률 (같은 지역 안에서 비교)
 function gradeOcc(o, base) {
   const G = [["A", "A등급"], ["B", "B등급"], ["CDE", "C~E등급"], ["none", "평가 없음"]];
@@ -335,6 +347,7 @@ async function run() {
     if (stay) h += signal(o, base);
     h += grades(o);
     if (stay) h += gradeOcc(o, base);
+    if (stay) h += foodDist(o, base, kind);
     if (stay && o.capN < o.n) h += `<p class="muted" style="font-size:.82rem">정원·현원은 상세 자료가 모인 ${num(o.capN)}곳 기준입니다 (전체 ${num(o.n)}곳).</p>`;
     // 시군구별 표
     const list = j.sggs.filter((x) => x.n || x.pop).sort((a, b) => (stay ? (b.occ ?? -1) - (a.occ ?? -1) : b.n - a.n));
