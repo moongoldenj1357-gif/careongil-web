@@ -1,5 +1,6 @@
 // 케어온길 AI 상담 — Claude Haiku. 대화 내용은 저장하지 않고, 하루 사용 횟수만 셈.
 //  POST /api/chat  { messages: [{role:"user"|"assistant", content:"..."}], ctx: ["기관기호:유형코드", ...] }
+//  실버타운·양로원 페이지: { messages, scope: "silver", sctx: [시설번호, ...] }  (silver_facilities, 하루 횟수는 같이 셈)
 //  → { reply, left }   (left = 오늘 남은 횟수)
 //  하루 한도: 1인(IP 기준, 해시로만 보관) CHAT_USER_DAILY(기본 10) · 사이트 전체 CHAT_SITE_DAILY(기본 300)
 import { createHash } from "node:crypto";
@@ -53,6 +54,42 @@ const SYSTEM = `당신은 '케어온길'의 AI 상담 도우미입니다. 케어
 - 문의: 주식회사 벤투런 031-818-6336, moongoldenj@naver.com.
 - 비즈 관련 질문에는 위 내용 안에서만 답하고, 세금 신고 방법이나 회계 처리처럼 위에 없는 것은 단정하지 말고 담당 세무사나 회사 문의처를 안내합니다. 리포트 구매를 강하게 권하지 않습니다.`;
 
+// 실버타운·양로원 페이지(/silver)에서 쓰는 추가 지침
+const SILVER_SYSTEM = `
+
+[지금 상담하는 곳] 사용자는 케어온길의 '실버타운·양로원' 페이지(www.careongil.kr/silver)에 있습니다. 이 페이지는 전국 노인주거복지시설(실버타운=노인복지주택, 양로원=양로시설, 노인공동생활가정)을 찾고 비교하는 곳이며, 시설 목록은 보건복지부 「2026 노인복지시설 현황」(2025년 말 기준)입니다.
+
+실버타운·양로원 상담 원칙
+- 시설별 사실(보증금, 매월 비용, 방 종류, 식사, 청소·세탁, 건강관리, 거동이 불편해졌을 때, 입주 조건, 보증금 반환)은 아래 [시설 자료]에 적힌 내용으로만 답합니다. 자료에 없거나 '시설 문의'인 항목은 지어내지 말고 "케어온길에 저장된 정보가 없어 시설에 문의하시면 됩니다"라고 답하고 시설 전화번호를 알려 줍니다.
+- [시설 자료]의 정보는 공개 자료(기사·정보 사이트)나 시설이 보내 준 정보를 옮긴 것이고, 출처와 확인일이 있습니다. 답할 때 "○○ 기준(확인일)"처럼 출처를 짧게 밝히고, 지금과 다를 수 있다고 덧붙입니다.
+- 보증금 반환, 위약금, 퇴소 조건은 꼭 계약서로 확인하시라고 권합니다. 일반적인 확인 사항으로 전입신고·확정일자 가능 여부, 반환보증 가입 여부, 반환 시기, 중도 해지 위약금, 건강 악화로 퇴소할 때의 예외를 알려 줄 수 있습니다.
+- 어느 시설이 더 좋다고 단정하지 않습니다. 비교는 자료에 있는 차이만 설명하고, 직접 방문·체험 입주를 권합니다.
+- 케어온길은 시설을 소개·알선하지 않고 입주 상담·계약은 시설과 직접 하신다는 점을 필요할 때 알려 줍니다.
+- 시설 운영자가 정보를 고치고 싶다고 하면, 시설 '자세히 보기' 맨 아래 '정보 등록·수정하기'를 안내합니다.
+
+알고 있는 기준 (노인복지법)
+- 실버타운(노인복지주택): 만 60세 이상이 입주하는 주거시설입니다. 장기요양등급이 없어도 들어갈 수 있고, 대부분 독립생활이 가능한 건강 상태를 입주 조건으로 둡니다. 돌봄이 많이 필요해지면 퇴소하거나 연계 요양시설로 옮겨야 할 수 있습니다. 2015년 법 개정 뒤로 새로 짓는 곳은 분양형이 아닌 임대형이고, 예전에 지은 분양형은 매매·임대 시세로 거래됩니다.
+- 양로원(양로시설): 일상생활에 지장이 없는 만 65세 이상 어르신이 입소해 식사와 생활 편의를 받는 곳입니다. 생계·의료급여 수급자 등은 무료, 소득이 일정 기준 이하이면 실비, 그 밖에는 유료로 이용합니다. 무료는 주민센터, 실비·유료는 시설에 신청합니다.
+- 노인공동생활가정: 가정처럼 함께 지내는 작은 양로시설입니다(정원 9명 이하).
+- 요양원(노인요양시설)과 다릅니다. 요양원은 장기요양등급(보통 1·2등급)을 받은 어르신이 돌봄을 받는 곳이며, 케어온길 첫 화면 '기관 찾기'에서 찾을 수 있습니다.`;
+
+const SILVER_KIND = { housing: "실버타운(노인복지주택)", yangro: "양로원(양로시설)", group: "노인공동생활가정" };
+const SILVER_INFO = [["monthly", "매월 비용"], ["rooms", "1인실·2인실"], ["meals", "식사"], ["cleaning", "청소·세탁"], ["health", "건강관리"], ["care", "거동 불편 시"], ["entry", "입주 조건"], ["refund", "보증금 반환"]];
+// 실버타운 페이지에서 보고 있는 시설(최대 5곳)을 DB에서 직접 읽어 요약
+async function silverFacts(ids) {
+  const ok = [...new Set((ids || []).map(String).filter((x) => /^\d{1,7}$/.test(x)))].slice(0, 5);
+  if (!ok.length) return "";
+  const rows = await sb("GET", `silver_facilities?select=id,kind,name,addr,tel,capacity,current,staff,est_date,operator,price_status,price_deposit,price_source,price_checked_at,info&id=in.(${ok.join(",")})`);
+  return rows.map((r) => {
+    const i = r.info || {}, fac = Array.isArray(i.fac_keys) ? i.fac_keys : [];
+    const unit = r.kind === "housing" ? "세대" : "명";
+    const dep = r.kind !== "housing" ? "시설 문의" : r.price_status === "공개" && r.price_deposit ? `${r.price_deposit} (${r.price_source || "출처 미상"}, ${r.price_checked_at || ""} 확인, 가장 낮은 금액)` : r.price_status === "분양형" ? "분양형이라 매매·임대 시세로 거래, 시설 문의" : "공개된 가격 없음, 시설 문의";
+    const items = SILVER_INFO.map(([k, l]) => `${l}: ${i[k] ? i[k] + (fac.includes(k) ? ` (시설 제공 정보, ${i.fac_at || ""} 확인)` : "") : "시설 문의"}`).join(" / ");
+    const src = i.src ? `공개 자료 출처: ${i.src}${i.at ? `, ${i.at} 확인` : ""}` : "";
+    return `- ${r.name} (${SILVER_KIND[r.kind] || r.kind}) | ${r.addr || "-"} | 전화 ${r.tel || "-"} | 규모 ${r.capacity ?? "-"}${unit}, 입주·현원 ${r.current ?? "-"}${unit}, 종사자 ${r.staff ?? "-"}명 | 설치일 ${r.est_date || "-"} | 운영 ${r.operator || "-"} | 보증금: ${dep} | ${items}${src ? ` | ${src}` : ""}`;
+  }).join("\n");
+}
+
 async function sb(method, path, body) {
   const r = await fetch(`${SB_URL}/rest/v1/${path}`, { method, headers: H(), body: body ? JSON.stringify(body) : undefined });
   const t = await r.text(); if (!r.ok) throw new Error(`DB ${r.status}: ${t.slice(0, 160)}`);
@@ -95,8 +132,14 @@ export default async function handler(req, res) {
       const msg = take?.why === "site" ? "오늘 AI 상담이 모두 마감되었습니다. 내일 다시 이용해 주시면 감사하겠습니다. 위의 자주 묻는 질문은 계속 보실 수 있습니다." : `오늘 무료 상담 ${USER_MAX}번을 모두 이용하셨습니다. 내일 다시 이용해 주시면 감사하겠습니다. 위의 자주 묻는 질문은 계속 보실 수 있습니다.`;
       return res.status(429).json({ 오류: msg, left: 0 });
     }
-    const f = await facts(body?.ctx).catch(() => "");
-    const system = SYSTEM + (f ? `\n\n[기관 자료] 사용자가 지금 보고 있는 기관입니다. 국민건강보험공단 공개 자료 기준이며 실제와 다를 수 있습니다.\n${f}` : "");
+    let system;
+    if (body?.scope === "silver") {
+      const f = await silverFacts(body?.sctx).catch(() => "");
+      system = SYSTEM + SILVER_SYSTEM + `\n\n[시설 자료] ${f ? `사용자가 지금 보고 있거나 비교 중인 시설입니다. 시설별 사실은 이 자료로만 답합니다.\n${f}` : "지금 보고 있는 시설이 없습니다. 특정 시설을 물으면, 실버타운·양로원 페이지에서 시설을 찾아 '이 시설 AI에게 묻기'를 누르시면 저장된 정보로 답해 드릴 수 있다고 안내합니다."}`;
+    } else {
+      const f = await facts(body?.ctx).catch(() => "");
+      system = SYSTEM + (f ? `\n\n[기관 자료] 사용자가 지금 보고 있는 기관입니다. 국민건강보험공단 공개 자료 기준이며 실제와 다를 수 있습니다.\n${f}` : "");
+    }
     const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
