@@ -140,29 +140,43 @@ export default async function handler(req, res) {
       const name = String(q.q || "").replace(/[*,()%\\.:"'`;=&]/g, " ").trim().slice(0, 30);
       const sids = String(q.ids || "").split(",").filter((x) => /^\d{1,7}$/.test(x)).slice(0, 5);   // 비교용
       if (!sids.length && !sido && name.length < 2) return res.status(400).json({ 오류: "시·도를 고르시거나 시설 이름을 2글자 이상 넣어 주시면 됩니다" });
-      const f = [`select=${SILVER_COLS}`];
-      if (sids.length) f.push(`id=in.(${sids.join(",")})`);
-      if (sido) {
-        const nms = SIDO_FULL[sido]; if (!nms) return res.status(200).json({ total: 0, page: 1, pages: 1, rows: [] });
-        f.push(`sido=in.(${nms.map((x) => `"${x}"`).join(",")})`);
-        if (sgg) {
-          const { data: g } = await sb(`sgg_names?select=sgg_nm&sido_cd=eq.${sido}&sgg_cd=eq.${sgg}&limit=1`);
-          const nm = String(g[0]?.sgg_nm || "").replace(/[*,()%\\.:"'`;=&]/g, " ").trim();
-          if (nm) f.push(`addr=ilike.${encodeURIComponent(`*${nm.replace(/\s+/g, "*")}*`)}`);
-        }
-      }
       const sk = String(q.skind || "").split(",").filter((k) => k in SILVER_NM);
-      if (sk.length) f.push(`kind=in.(${sk.join(",")})`);
-      if (name) f.push(`name=ilike.${encodeURIComponent(`*${name.replace(/\s+/g, "*")}*`)}`);
-      // 실버타운(노인복지주택) 먼저, 그다음 양로원·공동생활가정
-      f.push(`order=${q.sort === "capacity" ? "capacity.desc.nullslast,name.asc" : "name.asc"}`, "limit=300");
-      const { data } = await sb(`silver_facilities?${f.join("&")}`);
+      let sggNm = "";
+      if (sido && sgg) {
+        const { data: g } = await sb(`sgg_names?select=sgg_nm&sido_cd=eq.${sido}&sgg_cd=eq.${sgg}&limit=1`);
+        sggNm = String(g[0]?.sgg_nm || "").replace(/[*,()%\\.:"'`;=&]/g, " ").trim();
+      }
+      if (sido && !SIDO_FULL[sido]) return res.status(200).json({ total: 0, page: 1, pages: 1, rows: [] });
+      // pat: 이름 검색 모양(ilike), region: 고른 지역 안에서만 찾을지
+      const find = async (pat, region) => {
+        const f = [`select=${SILVER_COLS}`];
+        if (sids.length) f.push(`id=in.(${sids.join(",")})`);
+        if (region && sido) {
+          f.push(`sido=in.(${SIDO_FULL[sido].map((x) => `"${x}"`).join(",")})`);
+          if (sggNm) f.push(`addr=ilike.${encodeURIComponent(`*${sggNm.replace(/\s+/g, "*")}*`)}`);
+        }
+        if (sk.length) f.push(`kind=in.(${sk.join(",")})`);
+        if (pat) f.push(`name=ilike.${encodeURIComponent(pat)}`);
+        f.push(`order=${q.sort === "capacity" ? "capacity.desc.nullslast,name.asc" : "name.asc"}`, "limit=300");
+        return (await sb(`silver_facilities?${f.join("&")}`)).data;
+      };
+      const exact = name ? `*${name.replace(/\s+/g, "*")}*` : "";
+      let data = await find(exact, true), note = "";
+      // 이름으로 찾았는데 없으면: ① 전국에서 ② 띄어쓰기 무시 ③ 이름 앞부분으로 다시 찾음
+      if (name && !data.length && !sids.length) {
+        const compact = name.replace(/\s+/g, "");
+        const tries = [];
+        if (sido) tries.push([exact, "고르신 지역에는 없어 전국에서 찾은 결과입니다"]);
+        if (compact.length >= 3) tries.push([`*${[...compact].join("*")}*`, "띄어쓰기를 무시하고 찾은 결과입니다"]);
+        for (let n = compact.length - 1; n >= Math.max(3, compact.length - 6); n--) tries.push([`*${compact.slice(0, n)}*`, `'${compact.slice(0, n)}'(으)로 찾은 결과입니다. 시설 이름을 다시 확인해 주시면 좋습니다`]);
+        for (const [pat, msg] of tries) { data = await find(pat, false); if (data.length) { note = msg; break; } }
+      }
       const RANK = { housing: 0, yangro: 1, group: 2 };
       if (q.sort !== "capacity") data.sort((a, b) => (RANK[a.kind] ?? 9) - (RANK[b.kind] ?? 9));
       const rows = data.map((r) => ({ ...r, id: `silver-${r.id}`, sid: r.id, silver: true, kind_nm: SILVER_NM[r.kind] || "노인주거복지시설",
         now: r.current, sale_type: r.kind !== "housing" ? null : (r.units_sale || r.units_mixed_sale) ? ((r.units_rent || r.units_mixed_rent) ? "분양·임대 혼합" : "분양형") : "임대형" }));
       res.setHeader("Cache-Control", "public, s-maxage=600, stale-while-revalidate=3600");
-      return res.status(200).json({ total: rows.length, page: 1, pages: 1, rows });
+      return res.status(200).json({ total: rows.length, page: 1, pages: 1, rows, note });
     }
 
     // 2) 한 곳 또는 여러 곳(비교)
