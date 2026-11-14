@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>케어온길 실버타운·양로원 — 전국 노인복지주택·양로시설 찾기·비교</title>
+<meta name="description" content="전국 실버타운(노인복지주택)·양로원·노인공동생활가정을 지역별로 찾고, 규모·보증금(출처·확인일)·운영 주체를 비교해 보실 수 있습니다.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="케어온길">
+<meta property="og:title" content="케어온길 실버타운·양로원 — 찾기·비교">
+<meta property="og:description" content="전국 실버타운·양로원을 지역별로 찾고 시설끼리 비교해 보실 수 있습니다.">
+<meta property="og:url" content="https://www.careongil.kr/silver">
+<meta property="og:image" content="https://www.careongil.kr/og.png">
+<link rel="icon" type="image/png" href="/favicon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<style>
+:root{--bg:#f7f4ee;--card:#fff;--ink:#1f2a24;--sub:#5d6a62;--line:#e4ded2;--main:#2f6b4f;--main-soft:#e6f0ea;--warm:#c8762f;--warm-soft:#fbefe2;--r:14px}
+*{box-sizing:border-box}
+html{font-size:17px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;line-height:1.55;word-break:keep-all;padding-bottom:70px}
+a{color:var(--main)}
+button,select,input{font:inherit;color:inherit}
+.wrap{max-width:960px;margin:0 auto;padding:0 16px}
+header{background:#24473a;color:#fff;padding:22px 0 56px}
+.logo{display:flex;align-items:center;gap:10px;margin:0;font-size:1.35rem;font-weight:800}
+.logo svg{width:34px;height:34px}
+.logo .lt span{color:#f5a35c}
+.logo small{font-size:.8rem;font-weight:700;background:rgba(255,255,255,.16);border-radius:999px;padding:2px 9px}
+.tag{margin:8px 0 0;opacity:.92}
+.back{display:inline-block;margin-top:12px;color:#fff;opacity:.85;font-size:.9rem}
+main{margin-top:-36px}
+.search{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+.row{display:grid;gap:10px;grid-template-columns:1fr 1fr 1fr}
+@media (max-width:640px){.row{grid-template-columns:1fr}}
+label.f{display:block;font-size:.85rem;color:var(--sub);margin-bottom:4px}
+select,input[type=search]{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 14px;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--main);border-color:var(--main);color:#fff}
+.go{width:100%;margin-top:12px;padding:13px;border:0;border-radius:10px;background:var(--main);color:#fff;font-weight:700;font-size:1.05rem;cursor:pointer}
+.muted{color:var(--sub)}
+.meta{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:22px 0 10px;flex-wrap:wrap}
+.meta h2{font-size:1.1rem;margin:0}
+.list{display:grid;gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;cursor:pointer}
+.card:hover{border-color:var(--main)}
+.card h3{margin:0 0 4px;font-size:1.1rem}
+.addr{color:var(--sub);font-size:.92rem;margin:2px 0}
+.price{margin:10px 0 2px}.price b{color:var(--main)}
+.badges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.b{font-size:.78rem;padding:2px 8px;border-radius:6px;background:var(--main-soft);color:var(--main);font-weight:600}
+.b.w{background:var(--warm-soft);color:var(--warm)}
+.nums{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:12px 0 4px;text-align:center}
+.nums div{background:var(--bg);border-radius:10px;padding:8px 4px}
+.nums b{display:block;font-size:1.15rem}
+.nums small{color:var(--sub);font-size:.78rem}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 12px;cursor:pointer;text-decoration:none;color:var(--ink);font-size:.92rem}
+.btn.on{background:var(--warm);border-color:var(--warm);color:#fff}
+.btn.pri{background:var(--main);border-color:var(--main);color:#fff}
+.empty{background:var(--card);border:1px dashed var(--line);border-radius:var(--r);padding:28px;text-align:center;color:var(--sub)}
+.tray{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);box-shadow:0 -6px 20px rgba(0,0,0,.06);padding:10px 0;transform:translateY(110%);transition:transform .2s}
+.tray.show{transform:none}
+.tray .wrap{display:flex;align-items:center;gap:10px;justify-content:space-between}
+dialog{border:0;border-radius:var(--r);padding:0;width:min(720px,94vw);max-height:90vh}
+dialog.wide{width:min(1100px,96vw)}
+dialog::backdrop{background:rgba(20,28,24,.5)}
+.dlg-h{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff}
+.dlg-h h3{margin:0;font-size:1.1rem}
+.dlg-b{padding:16px 18px}
+.x{border:0;background:none;font-size:1.6rem;cursor:pointer;line-height:1}
+table.kv{width:100%;border-collapse:collapse}
+table.kv th,table.kv td{text-align:left;padding:9px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+table.kv th{width:30%;color:var(--sub);font-weight:500;white-space:nowrap}
+h4.sec{margin:18px 0 6px;color:var(--main)}
+.cmp{overflow-x:auto}
+.cmp table{border-collapse:collapse;min-width:100%}
+.cmp th,.cmp td{border-bottom:1px solid var(--line);padding:9px 8px;text-align:left;vertical-align:top;min-width:150px}
+.cmp th:first-child{position:sticky;left:0;background:#fff;min-width:80px;color:var(--sub);font-weight:500}
+.note{background:var(--warm-soft);border-radius:10px;padding:10px 12px;font-size:.88rem;margin-top:14px}
+.intro{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+@media (max-width:640px){.intro{grid-template-columns:1fr}}
+.intro div{background:var(--bg);border-radius:12px;padding:12px;font-size:.9rem}
+.intro b{display:block;color:var(--main)}
+footer{padding:28px 0 40px;color:var(--sub);font-size:.85rem}
+footer p{margin:6px 0}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <p class="logo"><svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="40" r="17" fill="#f5a35c"/><path d="M14 52 C 14 72, 30 84, 50 84 C 70 84, 86 72, 86 52" fill="none" stroke="#f3e2c7" stroke-width="14" stroke-linecap="round"/></svg><b class="lt">케어<span>온</span>길</b><small>실버타운·양로원</small></p>
+  <p class="tag">전국 실버타운·양로원을 지역별로 찾고, 시설끼리 비교해 보실 수 있습니다</p>
+  <a class="back" href="/">← 장기요양기관 찾기(케어온길)로 가기</a>
+</div></header>
+
+<main class="wrap">
+  <form class="search" id="sform" autocomplete="off">
+    <p class="muted" style="margin:0">실버타운과 양로원은 장기요양기관이 아니라 <b>어르신이 생활하시는 주거시설</b>입니다. 장기요양등급이 없어도 들어가실 수 있습니다.</p>
+    <div class="intro">
+      <div><b>실버타운</b>노인복지주택. 만 60세 이상이 보증금과 월 생활비를 내고 사는 집입니다.</div>
+      <div><b>양로원</b>양로시설. 어르신이 입소해 식사와 생활 편의를 받습니다. 무료·실비·유료가 있습니다.</div>
+      <div><b>노인공동생활가정</b>9명 이하가 가정처럼 함께 지내는 작은 양로시설입니다.</div>
+    </div>
+    <div class="row" style="margin-top:14px">
+      <div><label class="f" for="ssido">시·도</label><select id="ssido"><option value="">불러오는 중…</option></select></div>
+      <div><label class="f" for="ssgg">시·군·구</label><select id="ssgg"><option value="">전체</option></select></div>
+      <div><label class="f" for="ssort">정렬</label>
+        <select id="ssort"><option value="name">이름순</option><option value="capacity">규모 큰 순</option></select></div>
+    </div>
+    <div class="chips" id="skinds" role="group" aria-label="시설 종류"></div>
+    <label class="f" for="sq">시설 이름 (선택)</label>
+    <input type="search" id="sq" placeholder="예: 노블카운티" maxlength="30">
+    <button class="go" type="submit">찾기</button>
+  </form>
+  <div class="meta"><h2 id="scount">지역을 고르신 뒤 찾기를 눌러 주시면 됩니다</h2><span class="muted" id="shint"></span></div>
+  <div class="list" id="slist"></div>
+  <p class="note">시설 목록은 보건복지부 「2026 노인복지시설 현황」(2025년 말 기준)입니다. 보증금은 공개된 기사·시설 정보 사이트에서 가장 낮은 금액을 옮긴 것으로, 출처와 확인일을 함께 적었습니다. 실제 비용은 평형·인원·식사 횟수에 따라 달라지니 시설에 문의하시길 권해 드립니다.</p>
+</main>
+
+<div class="tray" id="stray"><div class="wrap">
+  <span><b id="strayN">0</b>/5곳 담음 <button class="btn" type="button" id="strayClear" style="margin-left:6px">비우기</button></span>
+  <button class="btn pri" type="button" id="strayGo">비교하기</button>
+</div></div>
+
+<dialog id="dlg"><div class="dlg-h"><h3 id="dlgT"></h3><button class="x" type="button" aria-label="닫기" onclick="dlg.close()">×</button></div><div class="dlg-b" id="dlgB"></div></dialog>
+
+<footer><div class="wrap">
+  <p><a href="/">케어온길 (장기요양기관 찾기)</a> · <a href="/biz">케어온길 비즈</a> · <a href="/privacy.html"><b>개인정보처리방침</b></a> · <a href="/terms.html">이용약관</a></p>
+  <p>케어온길은 시설을 소개·알선하지 않으며, 입주 상담과 계약은 시설과 직접 하셔야 합니다.</p>
+  <p>주식회사 벤투런 · 대표 문창조 · 사업자등록번호 588-86-02083 · 통신판매업 제2026-고양일산동-1926호<br>
+  경기도 고양시 일산동구 위시티4로 80, 111동 17층 1702호 · 031-818-6336 · moongoldenj@naver.com</p>
+</div></footer>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num = (v) => (v == null ? "–" : Number(v).toLocaleString("ko-KR"));
+const day = (s) => (s ? String(s).slice(0, 10) : "–");
+const dlg = $("#dlg");
+let regions = [];
+async function api(params) {
+  const r = await fetch("/api/search?" + new URLSearchParams(params));
+  const j = await r.json().catch(() => ({ 오류: "응답을 읽지 못했습니다" }));
+  if (!r.ok) throw new Error(j.오류 || "잠시 후 다시 시도해 주시기 바랍니다");
+  return j;
+}
+function show(title, html, wide) { dlg.classList.toggle("wide", !!wide); $("#dlgT").textContent = title; $("#dlgB").innerHTML = html; dlg.showModal(); }
+function alertBox(msg) { show("알림", `<p>${esc(msg)}</p>`); }
+const mapLink = (r) => (r.addr ? `https://map.kakao.com/link/search/${encodeURIComponent(r.addr)}` : null);
+function toUrl() {
+  const p = new URLSearchParams();
+  if (sstate.sido) p.set("sido", sstate.sido);
+  if (sstate.sgg) p.set("sgg", sstate.sgg);
+  if (sstate.kinds.join(",") !== "housing") p.set("kind", sstate.kinds.join(","));
+  if (sstate.q) p.set("q", sstate.q);
+  if (sstate.sort !== "name") p.set("sort", sstate.sort);
+  history.replaceState(null, "", p.toString() ? "?" + p : location.pathname);
+}
+
+// ---------- 실버타운·양로원 (따로 된 메뉴. 장기요양기관과 섞지 않고 이 안에서만 비교) ----------
+// 가격 표시 원칙: "보증금 ○억부터 · 출처 · 확인일"만 보여 주고, 자세한 비용은 시설에 문의하도록 안내
+const SKINDS = [["housing", "실버타운"], ["yangro", "양로원"], ["group", "노인공동생활가정"]];
+let sstate = { sido: "", sgg: "", kinds: ["housing"], q: "", sort: "name" };
+let spicks = [];
+try { spicks = JSON.parse(localStorage.getItem("cog_spicks") || "[]").map(String).slice(0, 5); } catch { spicks = []; }
+const saveSpicks = () => { try { localStorage.setItem("cog_spicks", JSON.stringify(spicks)); } catch {} ; drawStray(); };
+const silverCache = new Map();
+function silverPrice(r, long) {
+  if (r.kind !== "housing") return `<p class="muted">비용은 시설에 문의하시면 됩니다.</p>`;
+  if (r.price_status === "공개" && r.price_deposit)
+    return `<p class="price">보증금 <b>${esc(r.price_deposit)}</b> <span class="muted">· ${esc(r.price_source || "")} · ${esc(day(r.price_checked_at))} 확인</span></p>
+      <p class="muted">${long ? "평형·인원(1인·부부)·식사 횟수에 따라 보증금과 월 생활비가 크게 달라집니다. 공개된 자료에서 가장 낮은 금액을 옮긴 것이라 지금 금액과 다를 수 있으니, " : ""}자세한 비용은 시설에 문의하시길 권해 드립니다.</p>`;
+  if (r.price_status === "분양형") return `<p class="muted">분양형 시설이라 매매·임대 시세로 거래됩니다. 비용은 시설에 문의하시면 됩니다.</p>`;
+  return `<p class="muted">공개된 가격이 없습니다. 비용은 시설에 문의하시면 됩니다.</p>`;
+}
+const sUnit = (r) => (r.kind === "housing" ? "세대" : "명");
+function silverCard(r) {
+  const on = spicks.includes(String(r.sid));
+  return `<article class="card" data-silver="${r.sid}">
+    <div class="badges"><span class="b">${esc(r.kind_nm)}</span>${r.sale_type ? `<span class="b w">${esc(r.sale_type)}</span>` : ""}</div>
+    <h3>${esc(r.name)}</h3>
+    <p class="addr">${esc(r.addr || "")}</p>
+    <div class="nums">
+      <div><b>${num(r.capacity)}</b><small>${r.kind === "housing" ? "전체 세대" : "정원"}</small></div>
+      <div><b>${num(r.current)}</b><small>${r.kind === "housing" ? "입주 세대" : "현원"}</small></div>
+      <div><b>${num(r.staff)}</b><small>종사자</small></div></div>
+    ${silverPrice(r)}
+    <div class="acts">
+      <button class="btn pri more" type="button" data-silver="${r.sid}">자세히 보기 ›</button>
+      ${r.tel ? `<a class="btn" href="tel:${esc(r.tel)}">📞 ${esc(r.tel)}</a>` : ""}
+      <button class="btn ${on ? "on" : ""}" type="button" data-spick="${r.sid}">${on ? "✓ 비교에 담음" : "+ 비교 담기"}</button>
+    </div></article>`;
+}
+function silverDetail(sid) {
+  const r = silverCache.get(String(sid)); if (!r) return;
+  const ml = mapLink(r);
+  show(r.name, `
+    <div class="badges"><span class="b">${esc(r.kind_nm)}</span>${r.sale_type ? `<span class="b w">${esc(r.sale_type)}</span>` : ""}</div>
+    <table class="kv">
+      <tr><th>주소</th><td>${esc(r.addr || "–")}${ml ? ` <a href="${ml}" target="_blank" rel="noopener noreferrer">지도 ›</a>` : ""}</td></tr>
+      <tr><th>전화</th><td>${r.tel ? `<a href="tel:${esc(r.tel)}">${esc(r.tel)}</a>` : "–"}</td></tr>
+      <tr><th>${r.kind === "housing" ? "세대 수" : "정원"}</th><td>${num(r.capacity)}${sUnit(r)} <span class="muted">(${r.kind === "housing" ? "입주" : "현원"} ${num(r.current)})</span></td></tr>
+      <tr><th>종사자</th><td>${num(r.staff)}명</td></tr>
+      <tr><th>설치일</th><td>${esc(r.est_date || "–")}</td></tr>
+      <tr><th>운영 주체</th><td>${esc(r.operator || "–")}</td></tr>
+    </table>
+    <h4 class="sec">비용</h4>
+    ${silverPrice(r, true)}
+    <h4 class="sec">알아 두시면 좋은 점</h4>
+    <p class="muted">${r.kind === "housing"
+      ? "실버타운(노인복지주택)은 만 60세 이상이 입주하는 주거시설입니다. 장기요양등급이 없어도 들어가실 수 있지만 돌봄이 많이 필요해지면 퇴소하셔야 할 수 있습니다. 계약 전에 보증금 반환 조건, 의무 거주 기간, 식사 의무 횟수, 관리비에 포함되지 않는 항목을 확인하시길 권해 드립니다."
+      : "양로원(양로시설)과 노인공동생활가정은 어르신이 입소해 식사와 일상생활 편의를 받는 시설입니다. 장기요양 서비스를 하는 요양원과는 다릅니다. 소득·나이에 따라 무료·실비·유료로 나뉘니, 입소 조건과 비용은 시설이나 주민센터에 문의하시면 됩니다."}</p>
+    <p class="muted">시설 정보: ${esc(r.src || "보건복지부 노인복지시설 현황")} (2025년 말 기준). 지금과 다를 수 있습니다.</p>
+    <div class="acts">${r.tel ? `<a class="btn pri" href="tel:${esc(r.tel)}">📞 전화로 문의</a>` : ""}${ml ? `<a class="btn" href="${ml}" target="_blank" rel="noopener noreferrer">지도에서 보기</a>` : ""}</div>`);
+}
+function drawSkinds() {
+  $("#skinds").innerHTML = SKINDS.map(([k, n]) => `<button type="button" class="chip" data-sk="${k}" aria-pressed="${sstate.kinds.includes(k)}">${n}</button>`).join("");
+}
+$("#skinds").addEventListener("click", (e) => {
+  const k = e.target.dataset?.sk; if (!k) return;
+  sstate.kinds = sstate.kinds.includes(k) ? sstate.kinds.filter((x) => x !== k) : [...sstate.kinds, k];
+  drawSkinds();
+});
+function drawSsgg() {
+  const s = regions.find((r) => r.cd === $("#ssido").value);
+  const list = (s?.sggs || []).slice().sort((a, b) => a.nm.localeCompare(b.nm, "ko"));
+  $("#ssgg").innerHTML = `<option value="">전체</option>` + list.map((g) => `<option value="${g.cd}">${esc(g.nm)}</option>`).join("");
+  $("#ssgg").disabled = !list.length;
+}
+$("#ssido").addEventListener("change", drawSsgg);
+$("#sform").addEventListener("submit", (e) => {
+  e.preventDefault();
+  sstate = { sido: $("#ssido").value, sgg: $("#ssgg").value, kinds: sstate.kinds, q: $("#sq").value.trim(), sort: $("#ssort").value };
+  toUrl(); searchSilver(true);
+});
+async function searchSilver(scroll) {
+  if (!sstate.sido && sstate.q.length < 2) { $("#scount").textContent = "시·도를 고르시거나 시설 이름을 2글자 이상 넣어 주시면 됩니다"; return; }
+  $("#scount").textContent = "찾는 중입니다…"; $("#slist").innerHTML = ""; $("#shint").textContent = "";
+  try {
+    const p = { mode: "silver", sort: sstate.sort };
+    if (sstate.sido) p.sido = sstate.sido;
+    if (sstate.sgg) p.sgg = sstate.sgg;
+    if (sstate.q) p.q = sstate.q;
+    if (sstate.kinds.length) p.skind = sstate.kinds.join(",");
+    const j = await api(p);
+    j.rows.forEach((r) => silverCache.set(String(r.sid), r));
+    const nh = j.rows.filter((r) => r.kind === "housing").length;
+    $("#scount").textContent = `${num(j.total)}곳`;
+    $("#shint").textContent = j.total && nh !== j.total && nh ? `실버타운 ${nh} · 양로원·공동생활가정 ${j.total - nh}` : "";
+    $("#slist").innerHTML = j.rows.length ? j.rows.map(silverCard).join("")
+      : `<div class="empty">조건에 맞는 시설이 없습니다. 시·군·구를 '전체'로 넓히시거나 종류를 더 고르셔서 찾아보실 수 있습니다.</div>`;
+    if (scroll) $("#scount").scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (e) { $("#scount").textContent = "불러오지 못했습니다"; $("#slist").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+// 비교 (실버타운·양로원끼리만, 최대 5곳)
+function drawStray() { $("#strayN").textContent = spicks.length; $("#stray").classList.toggle("show", spicks.length > 0); }
+function setSpickBtns(id) {
+  document.querySelectorAll(`[data-spick="${id}"]`).forEach((b) => { const on = spicks.includes(String(id)); b.classList.toggle("on", on); b.textContent = on ? "✓ 비교에 담음" : "+ 비교 담기"; });
+}
+$("#strayClear").addEventListener("click", () => { const old = spicks; spicks = []; saveSpicks(); old.forEach(setSpickBtns); });
+$("#strayGo").addEventListener("click", async () => {
+  if (spicks.length < 2) { alertBox("2곳 이상 담으시면 비교하실 수 있습니다."); return; }
+  show("비교", "불러오는 중…", true);
+  try {
+    const miss = spicks.filter((id) => !silverCache.has(id));
+    if (miss.length) (await api({ mode: "silver", ids: miss.join(",") })).rows.forEach((r) => silverCache.set(String(r.sid), r));
+    const rows = spicks.map((id) => silverCache.get(id)).filter(Boolean);
+    const line = (label, f) => `<tr><th>${label}</th>${rows.map((r) => `<td>${f(r)}</td>`).join("")}</tr>`;
+    const price = (r) => (r.kind !== "housing" ? `<span class="muted">시설 문의</span>`
+      : r.price_status === "공개" && r.price_deposit ? `<b>${esc(r.price_deposit)}</b><br><span class="muted">${esc(r.price_source || "")} · ${esc(day(r.price_checked_at))} 확인</span>`
+      : r.price_status === "분양형" ? `<span class="muted">분양형 · 시설 문의</span>` : `<span class="muted">시설 문의</span>`);
+    show(`${rows.length}곳 비교`, `<div class="cmp"><table>
+      ${line("이름", (r) => `<b>${esc(r.name)}</b>`)}
+      ${line("종류", (r) => esc(r.kind_nm) + (r.sale_type ? `<br><span class="muted">${esc(r.sale_type)}</span>` : ""))}
+      ${line("보증금", price)}
+      ${line("주소", (r) => esc(r.addr || "–"))}
+      ${line("전화", (r) => (r.tel ? `<a href="tel:${esc(r.tel)}">${esc(r.tel)}</a>` : "–"))}
+      ${line("규모", (r) => `${num(r.capacity)}${sUnit(r)}`)}
+      ${line("입주·현원", (r) => `${num(r.current)}${sUnit(r)}`)}
+      ${line("종사자", (r) => `${num(r.staff)}명`)}
+      ${line("설치일", (r) => esc(r.est_date || "–"))}
+      ${line("운영 주체", (r) => esc(r.operator || "–"))}
+      ${line("", (r) => `<button class="btn" type="button" data-sunpick="${r.sid}">빼기</button>`)}
+    </table></div>
+    <p class="note">보증금은 공개된 자료에서 가장 낮은 금액을 옮긴 것입니다. 평형·인원·식사 횟수에 따라 보증금과 월 생활비가 크게 달라지니, 자세한 비용은 시설에 문의하시고 직접 방문해 보시길 권해 드립니다.</p>`, true);
+  } catch (e) { show("오류", `<p>${esc(e.message)}</p>`); }
+});
+$("#dlgB").addEventListener("click", (e) => {
+  const id = e.target.dataset?.sunpick; if (!id) return;
+  spicks = spicks.filter((x) => x !== id); saveSpicks(); setSpickBtns(id);
+  if (spicks.length >= 2) $("#strayGo").click(); else dlg.close();
+});
+
+
+document.addEventListener("click", (e) => {
+  if (e.target.closest("a[href]")) return;
+  const sp = e.target.closest("[data-spick]");
+  if (sp) {
+    const id = String(sp.dataset.spick);
+    if (spicks.includes(id)) spicks = spicks.filter((x) => x !== id);
+    else if (spicks.length >= 5) { alertBox("비교는 최대 5곳까지 담으실 수 있습니다."); return; }
+    else spicks.push(id);
+    saveSpicks(); setSpickBtns(id); return;
+  }
+  const sv = e.target.closest("[data-silver]"); if (sv) silverDetail(sv.dataset.silver);
+});
+
+// ---------- 시작 ----------
+(async function init() {
+  const u = new URLSearchParams(location.search);
+  if (u.has("kind")) { const k = u.get("kind").split(",").filter((x) => SKINDS.some(([y]) => y === x)); if (k.length) sstate.kinds = k; }
+  sstate.sido = u.get("sido") || ""; sstate.sgg = u.get("sgg") || ""; sstate.q = u.get("q") || ""; sstate.sort = u.get("sort") === "capacity" ? "capacity" : "name";
+  drawSkinds(); drawStray(); $("#sq").value = sstate.q; $("#ssort").value = sstate.sort;
+  try {
+    regions = (await api({ mode: "regions" })).sidos;
+    $("#ssido").innerHTML = `<option value="">시·도 선택</option>` + regions.map((s) => `<option value="${s.cd}">${esc(s.nm)}</option>`).join("");
+    $("#ssido").value = sstate.sido; drawSsgg(); $("#ssgg").value = sstate.sgg;
+    if (sstate.sido || sstate.q) searchSilver(false);
+  } catch (e) { $("#ssido").innerHTML = `<option value="">지역을 불러오지 못했습니다</option>`; }
+})();
+</script>
+</body>
+</html>
