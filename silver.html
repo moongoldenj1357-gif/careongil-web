@@ -200,6 +200,7 @@ let spicks = [];
 try { spicks = JSON.parse(localStorage.getItem("cog_spicks") || "[]").map(String).slice(0, 5); } catch { spicks = []; }
 const saveSpicks = () => { try { localStorage.setItem("cog_spicks", JSON.stringify(spicks)); } catch {} ; drawStray(); };
 const silverCache = new Map();
+let lastSRows = [];
 function silverPrice(r, long) {
   if (r.kind !== "housing") return `<p class="muted">비용은 시설에 문의하시면 됩니다.</p>`;
   if (r.price_status === "공개" && r.price_deposit)
@@ -247,6 +248,7 @@ function silverCard(r) {
       <button class="btn pri more" type="button" data-silver="${r.sid}">자세히 보기 ›</button>
       ${r.tel ? `<a class="btn" href="tel:${esc(r.tel)}">📞 ${esc(r.tel)}</a>` : ""}
       <button class="btn ${on ? "on" : ""}" type="button" data-spick="${r.sid}">${on ? "✓ 비교에 담음" : "+ 비교 담기"}</button>
+      <button class="btn" type="button" data-askai="${r.sid}">💬 AI에게 묻기</button>
     </div></article>`;
 }
 function silverDetail(sid) {
@@ -304,12 +306,12 @@ async function searchSilver(scroll) {
     if (sstate.q) p.q = sstate.q;
     if (sstate.kinds.length) p.skind = sstate.kinds.join(",");
     const j = await api(p);
-    j.rows.forEach((r) => silverCache.set(String(r.sid), r));
+    j.rows.forEach((r) => silverCache.set(String(r.sid), r)); lastSRows = j.rows;
     const nh = j.rows.filter((r) => r.kind === "housing").length;
     $("#scount").textContent = `${num(j.total)}곳`;
-    $("#shint").textContent = j.total && nh !== j.total && nh ? `실버타운 ${nh} · 양로원·공동생활가정 ${j.total - nh}` : "";
+    $("#shint").textContent = j.note || (j.total && nh !== j.total && nh ? `실버타운 ${nh} · 양로원·공동생활가정 ${j.total - nh}` : "");
     $("#slist").innerHTML = j.rows.length ? j.rows.map(silverCard).join("")
-      : `<div class="empty">조건에 맞는 시설이 없습니다. 시·군·구를 '전체'로 넓히시거나 종류를 더 고르셔서 찾아보실 수 있습니다.</div>`;
+      : `<div class="empty">조건에 맞는 시설이 없습니다. ${sstate.q ? "시설 이름을 짧게(예: '노블') 넣어 보시거나 " : ""}시·군·구를 '전체'로 넓히시거나 종류(양로원 등)를 더 고르셔서 찾아보실 수 있습니다.</div>`;
     if (scroll) $("#scount").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (e) { $("#scount").textContent = "불러오지 못했습니다"; $("#slist").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
 }
@@ -417,10 +419,13 @@ function openChat(ids) {
   $("#chatCtx").innerHTML = chatCtx.length ? `보고 있는 시설: <b>${names.map(esc).join(", ")}</b> <button type="button" class="lnk" id="ctxX">빼기</button>` : "";
   if (dlg.open) dlg.close();
   $("#chat").hidden = false; $("#chatBtn").hidden = true;
+  if (chatCtx.length && chatHist.length) chatAdd("bot", `이제부터 <b>${names.map(esc).join(", ")}</b>에 저장된 정보로 답해 드립니다.`);
   if (chatCtx.length && !chatHist.length) chatAdd("bot", `<b>${names.map(esc).join(", ")}</b>에 대해 궁금하신 점을 적어 주세요. 예: "보증금 외에 매월 얼마가 드나요?", "거동이 불편해지면 계속 살 수 있나요?"`);
+  if (!chatCtx.length && lastSRows.length > 5) { $("#chatCtx").hidden = false; $("#chatCtx").innerHTML = `특정 시설이 궁금하시면 카드의 <b>💬 AI에게 묻기</b>를 누르시거나, <b>비교 담기</b>로 담은 뒤 여시면 됩니다.`; }
   setTimeout(() => $("#chatIn").focus(), 50);
 }
-$("#chatBtn").addEventListener("click", () => openChat([]));
+// 오른쪽 아래 버튼으로 열면: 비교에 담은 시설, 없으면 지금 목록(5곳 이하)을 자동으로 넘김
+$("#chatBtn").addEventListener("click", () => openChat(spicks.length ? spicks : lastSRows.length && lastSRows.length <= 5 ? lastSRows.map((r) => r.sid) : []));
 $("#chatX").addEventListener("click", () => { $("#chat").hidden = true; $("#chatBtn").hidden = false; });
 $("#chatCtx").addEventListener("click", (e) => { if (e.target.id === "ctxX") { chatCtx = []; $("#chatCtx").hidden = true; } });
 $("#chatIn").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#chatForm").requestSubmit(); } });
