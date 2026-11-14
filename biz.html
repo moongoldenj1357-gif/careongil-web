@@ -104,18 +104,19 @@ footer p{margin:6px 0}
   </section>
 
   <section class="panel" id="simBox">
-    <h2>월 매출 모의계산</h2>
-    <p class="muted" style="margin:0">2026년 보건복지부 고시 수가로 장기요양급여 매출(공단 부담금 + 본인부담금)을 어림해 봅니다.</p>
+    <h2>월 매출·손익분기 모의계산</h2>
+    <p class="muted" style="margin:0">2026년 보건복지부 고시 수가로 장기요양급여 매출(공단 부담금 + 본인부담금)을 어림하고, 표준 비용 가정으로 몇 % 이용률부터 남는지(손익분기)를 봅니다.</p>
     <div class="row">
       <div><label class="f" for="sKind">기관 종류</label><select id="sKind"><option value="day">주야간보호 (8~10시간)</option><option value="home">요양원</option><option value="short">단기보호</option></select></div>
       <div><label class="f" for="sCap">정원 (명)</label><input type="number" id="sCap" min="1" max="300" value="30"></div>
       <div><label class="f" for="sGrade">이용자 평균 등급</label><select id="sGrade"><option value="1">1등급</option><option value="2">2등급</option><option value="3" selected>3등급</option><option value="4">4등급</option><option value="5">5등급</option></select></div>
       <div><label class="f" for="sOcc">예상 이용률 (%)</label><input type="number" id="sOcc" min="1" max="100" value="80"></div>
       <div><label class="f" for="sDays">한 달 이용일</label><input type="number" id="sDays" min="1" max="31" value="22"></div>
+      <div><label class="f" for="sRent">월 임대료 (만 원)</label><input type="number" id="sRent" min="0" max="10000" data-auto="1"></div>
     </div>
     <div class="out" id="sOut"></div>
     <div id="sTbl"></div>
-    <p class="note">급여 매출만 계산한 어림값입니다. 식재료비 등 비급여 수입은 빠져 있고, 인건비·임대료·차량비 같은 비용도 빼지 않았습니다. 가산·감산, 등급 구성, 실제 이용일에 따라 크게 달라집니다.</p>
+    <p class="note">어림값입니다. 매출은 급여만 넣었고 식재료비 등 비급여 수입은 빠져 있습니다. 비용은 표준 가정입니다: 인건비 = 이용률 95%일 때 매출의 60%(이용률과 관계없이 정원에 맞춰 배치), 식재료·공과금·소모품·차량 등 = 정원 1명당 월 25만 원(주야간보호 20만 원), 임대료 = 직접 넣지 않으면 정원 1명당 요양원·단기보호 7.56평 · 주야간보호 3평 × 평당 3만 원. 가산·감산, 등급 구성, 실제 이용일, 지역 임대료에 따라 크게 달라지며 수익을 보장하지 않습니다. 직접 넣은 인건비·투자금으로 회수 기간까지 보시려면 맞춤형 종합 분석을 이용해 주세요.</p>
   </section>
 
   <section class="panel" id="report">
@@ -333,14 +334,24 @@ const FEE = {
   home: { 1: 93070, 2: 86340, 3: 81540, 4: 81540, 5: 81540 },
   short: { 1: 74060, 2: 68580, 3: 63350, 4: 61680, 5: 60000 },
 };
+const OTHER = { day: 200000, home: 250000, short: 250000 }, AREA = { day: 3, home: 7.56, short: 7.56 }, MINCW = { day: 7, home: 2.3, short: 2.3 };
 function sim() {
   const k = $("#sKind").value, cap = +$("#sCap").value || 0, g = $("#sGrade").value, occ = Math.min(100, +$("#sOcc").value || 0), days = +$("#sDays").value || 0;
-  const fee = FEE[k][g], users = cap * occ / 100, m = users * fee * days;
-  $("#sOut").innerHTML = `하루 수가 ${won(fee)} × 평균 ${users.toFixed(1)}명 × ${days}일 → 월 급여 매출 약 <b>${won(m)}</b>`;
-  const rows = [60, 80, 95].map((p) => `<tr><td>이용률 ${p}%</td><td>${won(cap * p / 100 * fee * days)}</td></tr>`).join("");
-  $("#sTbl").innerHTML = `<div class="tbl"><table><tr><th>이용률별</th><th>월 급여 매출</th></tr>${rows}</table></div>`;
+  const fee = FEE[k][g], users = cap * occ / 100, m = users * fee * days, full = cap * fee * days;
+  const rentEl = $("#sRent");
+  if (rentEl.dataset.auto === "1") rentEl.value = Math.round(AREA[k] * cap * 3);
+  const rent = Math.max(0, +rentEl.value || 0) * 10000, labor = Math.round(full * 0.95 * 0.6), other = OTHER[k] * cap, fixed = labor + rent + other;
+  const be = full ? Math.round((fixed / full) * 1000) / 10 : null;
+  const pm = (x) => (x < 0 ? `<span style="color:#b3261e">−${won(-x)}</span>` : won(x));
+  $("#sOut").innerHTML = `하루 수가 ${won(fee)} × 평균 ${users.toFixed(1)}명 × ${days}일 → 월 급여 매출 약 <b>${won(m)}</b>`
+    + `<br>월 비용 약 ${won(fixed)} (인건비 ${won(labor)} · 임대료 ${won(rent)} · 기타 ${won(other)}) → `
+    + (be == null ? "" : be > 100 ? `<b>정원을 모두 채워도 적자</b>입니다. 비용이나 정원을 다시 보셔야 합니다.` : `손익분기 이용률 약 <b>${be}%</b> (평균 ${(cap * be / 100).toFixed(1)}명)`)
+    + `<br><span class="muted" style="font-size:.85rem">법정 최소 요양보호사: ${Math.ceil(cap / MINCW[k])}명 (이용자 ${MINCW[k]}명당 1명)</span>`;
+  const rows = [...new Set([60, 80, 95, occ])].sort((a, b) => a - b).map((p) => { const rev = cap * p / 100 * fee * days; return `<tr${p === occ ? ' style="font-weight:700"' : ""}><td>이용률 ${p}%</td><td>${won(rev)}</td><td>${pm(Math.round(rev - fixed))}</td></tr>`; }).join("");
+  $("#sTbl").innerHTML = `<div class="tbl"><table><tr><th>이용률별</th><th>월 급여 매출</th><th>월 손익(어림)</th></tr>${rows}</table></div>`;
 }
 ["#sKind", "#sCap", "#sGrade", "#sOcc", "#sDays"].forEach((s) => $(s).addEventListener("input", sim));
+$("#sRent").addEventListener("input", () => { $("#sRent").dataset.auto = $("#sRent").value === "" ? "1" : "0"; sim(); });
 $("#sKind").addEventListener("change", () => { $("#sDays").value = $("#sKind").value === "day" ? 22 : 30; sim(); });
 sim();
 
