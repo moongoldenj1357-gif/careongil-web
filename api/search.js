@@ -7,6 +7,7 @@
 //  /api/search?ids=기호:유형,기호:유형 (최대 5곳)              → 비교
 //  /api/search?mode=stats&sido=41&sgg=110&kind=daycare          → 창업 참고용 지역 요약 (시도 전체 + 시군구별)
 //  /api/search?mode=silver&sido=41&sgg=110&q=이름                → 실버타운·양로원 목록 (silver_facilities)
+//  /api/search?mode=silver&ids=1,2,3                             → 실버타운·양로원 비교 (최대 5곳)
 export const config = { maxDuration: 15 };
 const SB_URL = (process.env.SUPABASE_URL ?? "").trim().replace(/\/+$/, "").replace(/\/rest\/v1$/, "");
 const SB_KEY = process.env.SUPABASE_SECRET_KEY ?? "";
@@ -137,8 +138,10 @@ export default async function handler(req, res) {
       const sido = /^\d{2}$/.test(q.sido || "") ? q.sido : null;
       const sgg = /^\d{3}$/.test(q.sgg || "") ? q.sgg : null;
       const name = String(q.q || "").replace(/[*,()%\\.:"'`;=&]/g, " ").trim().slice(0, 30);
-      if (!sido && name.length < 2) return res.status(400).json({ 오류: "시·도를 고르시거나 시설 이름을 2글자 이상 넣어 주시면 됩니다" });
+      const sids = String(q.ids || "").split(",").filter((x) => /^\d{1,7}$/.test(x)).slice(0, 5);   // 비교용
+      if (!sids.length && !sido && name.length < 2) return res.status(400).json({ 오류: "시·도를 고르시거나 시설 이름을 2글자 이상 넣어 주시면 됩니다" });
       const f = [`select=${SILVER_COLS}`];
+      if (sids.length) f.push(`id=in.(${sids.join(",")})`);
       if (sido) {
         const nms = SIDO_FULL[sido]; if (!nms) return res.status(200).json({ total: 0, page: 1, pages: 1, rows: [] });
         f.push(`sido=in.(${nms.map((x) => `"${x}"`).join(",")})`);
