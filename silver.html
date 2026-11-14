@@ -82,6 +82,12 @@ h4.sec{margin:18px 0 6px;color:var(--main)}
 @media (max-width:640px){.intro{grid-template-columns:1fr}}
 .intro div{background:var(--bg);border-radius:12px;padding:12px;font-size:.9rem}
 .intro b{display:block;color:var(--main)}
+textarea,input.txt{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:#fff;font:inherit;margin-bottom:8px}
+.agree{display:block;margin-top:10px;background:#faf8f3;border-radius:10px;padding:10px 12px;font-size:.88rem}
+.agree small{display:block;color:var(--sub);margin-top:4px}
+.err{color:#b4472f;font-weight:700}
+.lnk{border:0;background:none;color:var(--main);font-weight:700;cursor:pointer;padding:0;font-size:.92rem;text-decoration:underline}
+.owner{margin:14px 0 0;text-align:right}
 footer{padding:28px 0 40px;color:var(--sub);font-size:.85rem}
 footer p{margin:6px 0}
 </style>
@@ -174,6 +180,29 @@ function silverPrice(r, long) {
   return `<p class="muted">공개된 가격이 없습니다. 비용은 시설에 문의하시면 됩니다.</p>`;
 }
 const sUnit = (r) => (r.kind === "housing" ? "세대" : "명");
+// 보호자가 가장 궁금해하는 8가지 (공개 자료 또는 시설이 직접 보낸 정보, 출처·확인일과 함께)
+const SI = [["monthly", "매월 비용", "보증금 외에 매월 얼마가 필요한가요?"], ["rooms", "1인실·2인실", "1인실과 2인실(부부)이 있나요?"],
+  ["meals", "식사", "식사는 하루 몇 끼 제공하나요?"], ["cleaning", "청소·세탁", "청소와 세탁 서비스가 있나요?"],
+  ["health", "건강관리", "병원이나 건강관리 서비스는 어떻게 제공되나요?"], ["care", "거동 불편 시", "거동이 불편해지면 계속 거주할 수 있나요?"],
+  ["entry", "입주 조건", "입주하려면 어떤 조건이 필요한가요?"], ["refund", "보증금 반환", "계약을 해지하면 보증금은 어떻게 돌려받나요?"]];
+const infoV = (r, k) => (r.info && r.info[k]) || "";
+// 항목별 출처: 공개 자료(src·at) / 시설 제공(fac_keys·fac_at)
+const isFac = (r, k) => !!(r.info && Array.isArray(r.info.fac_keys) && r.info.fac_keys.includes(k));
+function infoSrc(r) {
+  if (!r.info) return "";
+  const keys = SI.map(([k]) => k).filter((k) => r.info[k]);
+  const fac = keys.filter((k) => isFac(r, k)), pub = keys.filter((k) => !isFac(r, k));
+  const out = [];
+  if (pub.length && r.info.src) out.push(`공개 자료 (${esc(r.info.src)}${r.info.at ? ` · ${esc(r.info.at)} 확인` : ""})`);
+  if (fac.length) out.push(`시설 제공 정보 ${pub.length ? `(${fac.map((k) => SI.find(([x]) => x === k)[1]).join("·")}) ` : ""}· ${esc(r.info.fac_at || "")} 확인`);
+  return out.join(" / ");
+}
+function infoHtml(r) {
+  const has = SI.some(([k]) => infoV(r, k));
+  return `<h4 class="sec">자주 묻는 8가지</h4>
+    <table class="kv">${SI.map(([k, l]) => `<tr><th>${l}</th><td>${infoV(r, k) ? esc(infoV(r, k)) + (isFac(r, k) ? ` <span class="b w">시설 제공</span>` : "") : `<span class="muted">시설 문의</span>`}</td></tr>`).join("")}</table>
+    <p class="muted">${has ? infoSrc(r) + ". " : ""}지금과 다를 수 있고, 특히 보증금 반환과 퇴소 조건은 계약서로 꼭 확인하시길 권해 드립니다.</p>`;
+}
 function silverCard(r) {
   const on = spicks.includes(String(r.sid));
   return `<article class="card" data-silver="${r.sid}">
@@ -206,12 +235,14 @@ function silverDetail(sid) {
     </table>
     <h4 class="sec">비용</h4>
     ${silverPrice(r, true)}
+    ${r.kind === "housing" ? infoHtml(r) : ""}
     <h4 class="sec">알아 두시면 좋은 점</h4>
     <p class="muted">${r.kind === "housing"
       ? "실버타운(노인복지주택)은 만 60세 이상이 입주하는 주거시설입니다. 장기요양등급이 없어도 들어가실 수 있지만 돌봄이 많이 필요해지면 퇴소하셔야 할 수 있습니다. 계약 전에 보증금 반환 조건, 의무 거주 기간, 식사 의무 횟수, 관리비에 포함되지 않는 항목을 확인하시길 권해 드립니다."
       : "양로원(양로시설)과 노인공동생활가정은 어르신이 입소해 식사와 일상생활 편의를 받는 시설입니다. 장기요양 서비스를 하는 요양원과는 다릅니다. 소득·나이에 따라 무료·실비·유료로 나뉘니, 입소 조건과 비용은 시설이나 주민센터에 문의하시면 됩니다."}</p>
     <p class="muted">시설 정보: ${esc(r.src || "보건복지부 노인복지시설 현황")} (2025년 말 기준). 지금과 다를 수 있습니다.</p>
-    <div class="acts">${r.tel ? `<a class="btn pri" href="tel:${esc(r.tel)}">📞 전화로 문의</a>` : ""}${ml ? `<a class="btn" href="${ml}" target="_blank" rel="noopener noreferrer">지도에서 보기</a>` : ""}</div>`);
+    <div class="acts">${r.tel ? `<a class="btn pri" href="tel:${esc(r.tel)}">📞 전화로 문의</a>` : ""}${ml ? `<a class="btn" href="${ml}" target="_blank" rel="noopener noreferrer">지도에서 보기</a>` : ""}</div>
+    <p class="owner"><button type="button" class="lnk" data-owner="${r.sid}">이 시설 운영자이신가요? 정보 등록·수정하기 ›</button></p>`);
 }
 function drawSkinds() {
   $("#skinds").innerHTML = SKINDS.map(([k, n]) => `<button type="button" class="chip" data-sk="${k}" aria-pressed="${sstate.kinds.includes(k)}">${n}</button>`).join("");
@@ -273,6 +304,8 @@ $("#strayGo").addEventListener("click", async () => {
       ${line("이름", (r) => `<b>${esc(r.name)}</b>`)}
       ${line("종류", (r) => esc(r.kind_nm) + (r.sale_type ? `<br><span class="muted">${esc(r.sale_type)}</span>` : ""))}
       ${line("보증금", price)}
+      ${SI.map(([k, l]) => line(l, (r) => (infoV(r, k) ? esc(infoV(r, k)) : `<span class="muted">시설 문의</span>`))).join("")}
+      ${line("정보 출처", (r) => `<span class="muted">${infoSrc(r) || "–"}</span>`)}
       ${line("주소", (r) => esc(r.addr || "–"))}
       ${line("전화", (r) => (r.tel ? `<a href="tel:${esc(r.tel)}">${esc(r.tel)}</a>` : "–"))}
       ${line("규모", (r) => `${num(r.capacity)}${sUnit(r)}`)}
@@ -282,7 +315,7 @@ $("#strayGo").addEventListener("click", async () => {
       ${line("운영 주체", (r) => esc(r.operator || "–"))}
       ${line("", (r) => `<button class="btn" type="button" data-sunpick="${r.sid}">빼기</button>`)}
     </table></div>
-    <p class="note">보증금은 공개된 자료에서 가장 낮은 금액을 옮긴 것입니다. 평형·인원·식사 횟수에 따라 보증금과 월 생활비가 크게 달라지니, 자세한 비용은 시설에 문의하시고 직접 방문해 보시길 권해 드립니다.</p>`, true);
+    <p class="note">보증금과 8가지 항목은 공개 자료나 시설이 보내 준 정보를 옮긴 것이라 지금과 다를 수 있습니다. 평형·인원·식사 횟수에 따라 비용이 크게 달라지니 시설에 문의하시고, 보증금 반환·퇴소 조건은 계약서로 꼭 확인하시길 권해 드립니다.</p>`, true);
   } catch (e) { show("오류", `<p>${esc(e.message)}</p>`); }
 });
 $("#dlgB").addEventListener("click", (e) => {
@@ -291,6 +324,40 @@ $("#dlgB").addEventListener("click", (e) => {
   if (spicks.length >= 2) $("#strayGo").click(); else dlg.close();
 });
 
+
+// 시설 운영자가 직접 정보 등록·수정 (관리자 확인 후 공개)
+function ownerForm(sid) {
+  const r = silverCache.get(String(sid)); if (!r) return;
+  show(`${r.name} · 정보 등록·수정`, `
+    <p class="muted" style="margin-top:0">시설 운영자·담당자께서 아래 내용을 적어 보내 주시면, 케어온길이 시설 대표전화 등으로 확인한 뒤 <b>'시설 제공 정보'</b>로 공개합니다. 아시는 항목만 적으셔도 됩니다. 등록은 무료입니다.</p>
+    <form id="ownF">
+      ${SI.map(([k, l, q]) => `<label class="f" for="o_${k}">${l} — ${q}</label><textarea id="o_${k}" maxlength="300" rows="2">${esc(infoV(r, k))}</textarea>`).join("")}
+      <div class="row" style="margin-top:6px">
+        <div><label class="f" for="o_name">담당자 성함 (필수)</label><input class="txt" id="o_name" maxlength="30"></div>
+        <div><label class="f" for="o_role">직위</label><input class="txt" id="o_role" maxlength="30" placeholder="예: 원장, 사무국장"></div>
+        <div><label class="f" for="o_contact">연락처 (필수)</label><input class="txt" id="o_contact" maxlength="60" placeholder="전화 또는 이메일"></div>
+      </div>
+      <input type="text" id="o_hp" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true">
+      <label class="agree"><input type="checkbox" id="o_agree"> 개인정보 수집·이용에 동의합니다.
+        <small>수집 항목: 담당자 성함·직위·연락처 · 목적: 시설 정보 확인 · 보유 기간: 처리 후 180일(처리 전 요청은 최대 1년) · 동의하지 않으실 수 있으나 그 경우 보내실 수 없습니다. <a href="/privacy.html" target="_blank">개인정보처리방침</a></small></label>
+      <p class="err" id="o_err"></p>
+      <button class="go" type="submit">보내기</button>
+    </form>`);
+  $("#ownF").onsubmit = async (e) => {
+    e.preventDefault();
+    const info = {}; SI.forEach(([k]) => { info[k] = $("#o_" + k).value.trim(); });
+    const body = { sid: r.sid, info, writer_name: $("#o_name").value.trim(), writer_role: $("#o_role").value.trim(), writer_contact: $("#o_contact").value.trim(), agree: $("#o_agree").checked, hp: $("#o_hp").value };
+    if (body.writer_name.length < 2 || body.writer_contact.length < 7) { $("#o_err").textContent = "담당자 성함과 연락처를 적어 주시면 됩니다"; return; }
+    if (!body.agree) { $("#o_err").textContent = "개인정보 수집·이용에 동의해 주셔야 보내실 수 있습니다"; return; }
+    const btn = e.target.querySelector("button[type=submit]"); btn.disabled = true; $("#o_err").textContent = "";
+    try {
+      const res = await fetch("/api/silver-info", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.오류 || "보내지 못했습니다");
+      show("보내 주셔서 감사합니다", `<p>보내 주신 내용은 케어온길이 확인한 뒤 공개됩니다. 확인을 위해 적어 주신 연락처나 시설 대표전화로 연락드릴 수 있습니다.</p>`);
+    } catch (er) { $("#o_err").textContent = er.message; btn.disabled = false; }
+  };
+}
 
 document.addEventListener("click", (e) => {
   if (e.target.closest("a[href]")) return;
@@ -302,6 +369,7 @@ document.addEventListener("click", (e) => {
     else spicks.push(id);
     saveSpicks(); setSpickBtns(id); return;
   }
+  const ow = e.target.closest("[data-owner]"); if (ow) { ownerForm(ow.dataset.owner); return; }
   const sv = e.target.closest("[data-silver]"); if (sv) silverDetail(sv.dataset.silver);
 });
 

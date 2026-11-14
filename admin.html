@@ -37,7 +37,8 @@ const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const won = (n) => Number(n).toLocaleString("ko-KR") + "원";
 const ST = { requested: "입금 대기", done: "발행 완료", canceled: "취소" };
-let code = sessionStorage.getItem("cog_admin") || "", rows = [], tab = "requested", seen = null, timer;
+let code = sessionStorage.getItem("cog_admin") || "", rows = [], tab = "requested", seen = null, timer, silver = [];
+const SI = [["monthly","매월 비용"],["rooms","1인실·2인실"],["meals","식사"],["cleaning","청소·세탁"],["health","건강관리"],["care","거동 불편 시"],["entry","입주 조건"],["refund","보증금 반환"]];
 
 async function call(method, body) {
   const r = await fetch("/api/admin" + (method === "GET" ? "?list=1" : ""), { method, headers: { "x-admin-code": code, "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
@@ -69,6 +70,7 @@ function draw(kakao) {
   <div class="card"><b>카카오톡 알림</b> — ${kakao.connected ? `✅ 연결됨${kakao.refreshUntil ? ` (다시 연결 필요 예상: ${kakao.refreshUntil} 무렵)` : ""} <button id="kt">시험 보내기</button> <button id="kc">다시 연결</button>` : `❌ 연결 안 됨 <button class="pri" id="kc">카카오톡 알림 연결하기</button>`}
     <span class="kv" id="km"></span>
     <br><span class="kv">브라우저 알림: <button id="bn">이 화면에서 알림 받기</button> (관리자 화면을 열어 두면 1분마다 새 신청을 확인합니다)</span></div>
+  ${silverCard()}
   <div class="tabs">${[["requested", `입금 대기 ${nReq}`], ["done", "발행 완료"], ["canceled", "취소"], ["all", "전체"]].map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${l}</button>`).join(" ")} <button id="rf">새로 고침</button></div>
   ${list.length ? list.map((o) => `<div class="o ${o.status === "requested" ? "new" : ""}">
     <h3>${esc(o.no)} · ${esc(o.product_nm)} <span class="chip ${o.status}">${ST[o.status]}</span></h3>
@@ -80,11 +82,21 @@ function draw(kakao) {
       <a href="/order?t=${encodeURIComponent(o.token)}" target="_blank"><button>고객 화면</button></a>
       ${o.status !== "canceled" ? `<button class="warn" data-a="cancel" data-no="${o.no}">취소</button>` : ""}</div></div>`).join("") : `<p class="kv">해당하는 신청이 없습니다.</p>`}`;
 }
+function silverCard() {
+  if (!Array.isArray(silver)) return `<div class="card err">실버타운 요청을 불러오지 못했습니다: ${esc(silver.err || "")}</div>`;
+  if (!silver.length) return `<div class="card"><b>실버타운 정보 등록 요청</b> — 확인을 기다리는 요청이 없습니다.</div>`;
+  return `<div class="card"><b>실버타운 정보 등록 요청 ${silver.length}건</b> <span class="kv">승인하면 시설이 적은 항목이 '시설 제공 정보'로 바로 공개됩니다. 연락처로 시설이 맞는지 확인하신 뒤 승인하시길 권합니다.</span>
+    ${silver.map((r) => { const f = r.facility || {}, old = f.info || {};
+      return `<div class="o new"><h3>${esc(f.name || "시설 #" + r.sid)} <span class="kv">${esc(f.sido || "")} · 대표전화 ${esc(f.tel || "–")}</span></h3>
+      <div class="kv">보낸 분: ${esc(r.writer_name)}${r.writer_role ? ` (${esc(r.writer_role)})` : ""} · ${esc(r.writer_contact)} · ${new Date(r.created_at).toLocaleString("ko-KR")}</div>
+      <table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:.9rem">${SI.filter(([k]) => r.info[k]).map(([k, l]) => `<tr><th style="text-align:left;width:22%;vertical-align:top;padding:4px">${l}</th><td style="padding:4px"><b>${esc(r.info[k])}</b>${old[k] ? `<br><span class="kv">지금: ${esc(old[k])}</span>` : ""}</td></tr>`).join("")}</table>
+      <div class="acts"><button class="pri" data-sa="silverApprove" data-id="${r.id}">승인 → 공개</button><button class="warn" data-sa="silverReject" data-id="${r.id}">반려</button></div></div>`; }).join("")}</div>`;
+}
 async function load() {
   if (!code) return login();
   try {
     const j = await call("GET");
-    rows = j.rows;
+    rows = j.rows; silver = j.silver || [];
     const ids = new Set(rows.filter((o) => o.status === "requested").map((o) => o.no));
     if (seen) { const fresh = [...ids].filter((x) => !seen.has(x)); if (fresh.length && "Notification" in window && Notification.permission === "granted") new Notification("케어온길 새 리포트 신청", { body: `${fresh.length}건이 들어왔습니다` }); }
     seen = ids;
@@ -99,6 +111,12 @@ document.addEventListener("click", async (e) => {
   if (b.id === "bn") { if ("Notification" in window) await Notification.requestPermission(); b.textContent = Notification.permission === "granted" ? "켜짐" : "브라우저에서 허용해 주세요"; return; }
   if (b.id === "kc") { try { location.href = (await call("POST", { action: "kakaoUrl" })).url; } catch (er) { $("#km").textContent = er.message; } return; }
   if (b.id === "kt") { try { await call("POST", { action: "kakaoTest" }); $("#km").textContent = "보냈습니다. 카톡 '나와의 채팅'을 확인하세요."; } catch (er) { $("#km").textContent = er.message; } return; }
+  if (b.dataset.sa) {
+    if (!confirm(b.dataset.sa === "silverApprove" ? "이 내용을 '시설 제공 정보'로 공개할까요?" : "이 요청을 반려할까요?")) return;
+    b.disabled = true;
+    try { await call("POST", { action: b.dataset.sa, id: b.dataset.id }); } catch (er) { alert(er.message); }
+    return load();
+  }
   const a = b.dataset.a, no = b.dataset.no; if (!a) return;
   const ask = { approve: `${no} 입금을 확인하셨나요? 보고서를 바로 발행합니다.`, rebuild: `${no} 보고서를 최신 자료로 다시 만들까요?`, cancel: `${no} 신청을 취소할까요?` }[a];
   if (!confirm(ask)) return;
