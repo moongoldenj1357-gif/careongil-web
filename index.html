@@ -81,6 +81,7 @@ b.bad{color:var(--bad)}
 .b{font-size:.78rem;padding:2px 8px;border-radius:6px;background:var(--main-soft);color:var(--main);font-weight:600}
 .b.w{background:var(--warm-soft);color:var(--warm)}
 .addr{color:var(--sub);font-size:.92rem;margin:2px 0}
+.price{margin:10px 0 2px}.price b{color:var(--main)}
 .nums{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:12px 0 4px;text-align:center}
 .nums div{background:var(--bg);border-radius:10px;padding:8px 4px}
 .nums b{display:block;font-size:1.15rem}
@@ -369,7 +370,7 @@ footer p{margin:4px 0}
 </div></footer>
 
 <script>
-const KINDS = [["home","요양원"],["daycare","주야간보호"],["short","단기보호"],["visit_care","방문요양"],["visit_bath","방문목욕"],["visit_nurse","방문간호"]];
+const KINDS = [["home","요양원"],["daycare","주야간보호"],["short","단기보호"],["visit_care","방문요양"],["visit_bath","방문목욕"],["visit_nurse","방문간호"],["silver","실버타운·양로원"]];
 const STAY = new Set(["home","daycare","short"]);  // 정원·현원이 있는 종류
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -395,7 +396,9 @@ function drawKinds() {
 }
 $("#kinds").addEventListener("click", (e) => {
   const k = e.target.dataset?.k; if (!k) return;
-  state.kinds = state.kinds.includes(k) ? state.kinds.filter((x) => x !== k) : [...state.kinds, k];
+  // 실버타운·양로원은 장기요양기관과 자료가 달라서 따로 찾음 (함께 고를 수 없음)
+  if (k === "silver") state.kinds = state.kinds.includes("silver") ? [] : ["silver"];
+  else state.kinds = state.kinds.includes(k) ? state.kinds.filter((x) => x !== k) : [...state.kinds.filter((x) => x !== "silver"), k];
   drawKinds();
 });
 function drawSgg() {
@@ -459,10 +462,80 @@ function card(r) {
       <button class="btn ${isFav(r.id) ? "fav-on" : ""}" type="button" data-fav="${r.id}">${favLabel(isFav(r.id))}</button>
     </div></article>`;
 }
+// ---------- 실버타운·양로원 ----------
+// 가격 표시 원칙: "보증금 ○억부터 · 출처 · 확인일"만 보여 주고, 자세한 비용은 시설에 문의하도록 안내
+function silverPrice(r, long) {
+  if (r.kind !== "housing") return `<p class="muted">비용은 시설에 문의하시면 됩니다.</p>`;
+  if (r.price_status === "공개" && r.price_deposit)
+    return `<p class="price">보증금 <b>${esc(r.price_deposit)}</b> <span class="muted">· ${esc(r.price_source || "")} · ${esc(day(r.price_checked_at))} 확인</span></p>
+      <p class="muted">${long ? "평형·인원(1인·부부)·식사 횟수에 따라 보증금과 월 생활비가 크게 달라집니다. 공개된 자료에서 가장 낮은 금액을 옮긴 것이라 지금 금액과 다를 수 있으니, " : ""}자세한 비용은 시설에 문의하시길 권해 드립니다.</p>`;
+  if (r.price_status === "분양형") return `<p class="muted">분양형 시설이라 매매·임대 시세로 거래됩니다. 비용은 시설에 문의하시면 됩니다.</p>`;
+  return `<p class="muted">공개된 가격이 없습니다. 비용은 시설에 문의하시면 됩니다.</p>`;
+}
+function silverCard(r) {
+  const unit = r.kind === "housing" ? "세대" : "명";
+  return `<article class="card" data-silver="${r.sid}">
+    <div class="badges"><span class="b">${esc(r.kind_nm)}</span>${r.sale_type ? `<span class="b w">${esc(r.sale_type)}</span>` : ""}</div>
+    <h3>${esc(r.name)}</h3>
+    <p class="addr">${esc(r.addr || "")}</p>
+    <div class="nums">
+      <div><b>${num(r.capacity)}</b><small>${r.kind === "housing" ? "전체 세대" : "정원"}</small></div>
+      <div><b>${num(r.current)}</b><small>${r.kind === "housing" ? "입주 세대" : "현원"}</small></div>
+      <div><b>${num(r.staff)}</b><small>종사자</small></div></div>
+    ${silverPrice(r)}
+    <div class="acts">
+      <button class="btn pri more" type="button" data-silver="${r.sid}">자세히 보기 ›</button>
+      ${r.tel ? `<a class="btn" href="tel:${esc(r.tel)}">📞 ${esc(r.tel)}</a>` : ""}
+    </div></article>`;
+}
+function silverDetail(sid) {
+  const r = silverCache.get(String(sid)); if (!r) return;
+  const ml = mapLink(r);
+  show(r.name, `
+    <div class="badges"><span class="b">${esc(r.kind_nm)}</span>${r.sale_type ? `<span class="b w">${esc(r.sale_type)}</span>` : ""}</div>
+    <table class="kv">
+      <tr><th>주소</th><td>${esc(r.addr || "–")}${ml ? ` <a href="${ml}" target="_blank" rel="noopener noreferrer">지도 ›</a>` : ""}</td></tr>
+      <tr><th>전화</th><td>${r.tel ? `<a href="tel:${esc(r.tel)}">${esc(r.tel)}</a>` : "–"}</td></tr>
+      <tr><th>${r.kind === "housing" ? "세대 수" : "정원"}</th><td>${num(r.capacity)}${r.kind === "housing" ? "세대" : "명"} <span class="muted">(${r.kind === "housing" ? "입주" : "현원"} ${num(r.current)})</span></td></tr>
+      <tr><th>종사자</th><td>${num(r.staff)}명</td></tr>
+      <tr><th>설치일</th><td>${esc(r.est_date || "–")}</td></tr>
+      <tr><th>운영 주체</th><td>${esc(r.operator || "–")}</td></tr>
+    </table>
+    <h4 class="sec">비용</h4>
+    ${silverPrice(r, true)}
+    <h4 class="sec">알아 두시면 좋은 점</h4>
+    <p class="muted">${r.kind === "housing"
+      ? "실버타운(노인복지주택)은 만 60세 이상이 입주하는 주거시설입니다. 장기요양등급이 없어도 들어가실 수 있지만 돌봄이 많이 필요해지면 퇴소하셔야 할 수 있습니다. 계약 전에 보증금 반환 조건, 의무 거주 기간, 식사 의무 횟수, 관리비에 포함되지 않는 항목을 확인하시길 권해 드립니다."
+      : "양로원(양로시설)과 노인공동생활가정은 어르신이 입소해 식사와 일상생활 편의를 받는 시설입니다. 장기요양 서비스를 하는 요양원과는 다릅니다. 소득·나이에 따라 무료·실비·유료로 나뉘니, 입소 조건과 비용은 시설이나 주민센터에 문의하시면 됩니다."}</p>
+    <p class="muted">시설 정보: ${esc(r.src || "보건복지부 노인복지시설 현황")} (2025년 말 기준). 지금과 다를 수 있습니다.</p>
+    <div class="acts">${r.tel ? `<a class="btn pri" href="tel:${esc(r.tel)}">📞 전화로 문의</a>` : ""}${ml ? `<a class="btn" href="${ml}" target="_blank" rel="noopener noreferrer">지도에서 보기</a>` : ""}</div>`);
+}
+const silverCache = new Map();
+async function searchSilver(scroll) {
+  const p = { mode: "silver", sort: state.sort === "capacity" ? "capacity" : "name" };
+  if (state.sido) p.sido = state.sido;
+  if (state.sgg) p.sgg = state.sgg;
+  if (state.q) p.q = state.q;
+  const j = await api(p);
+  lastRows = j.rows; j.rows.forEach((r) => silverCache.set(String(r.sid), r));
+  const nh = j.rows.filter((r) => r.kind === "housing").length;
+  $("#count").textContent = `${num(j.total)}곳`;
+  $("#hint").textContent = j.total ? `실버타운 ${nh} · 양로원·공동생활가정 ${j.total - nh}` : "";
+  $("#list").innerHTML = j.rows.length ? j.rows.map(silverCard).join("")
+    : `<div class="empty">이 지역에서 찾은 실버타운·양로원이 없습니다. 시·군·구를 '전체'로 넓혀서 찾아보실 수 있습니다.</div>`;
+  if (mapView) drawBigMap(j.rows);
+  if (scroll) $(".meta").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 async function search(scroll) {
   toUrl();
   if (!state.sido && state.q.length < 2) { $("#count").textContent = "시·도를 고르시거나 기관 이름을 2글자 이상 넣어 주시면 됩니다"; return; }
   $("#count").textContent = "찾는 중입니다…"; $("#list").innerHTML = ""; $("#pager").innerHTML = "";
+  if (state.kinds.includes("silver")) {
+    try { await searchSilver(scroll); }
+    catch (e) { $("#count").textContent = "불러오지 못했습니다"; $("#list").innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+    return;
+  }
   try {
     const p = { sort: state.sort, page: state.page };
     if (state.sido) p.sido = state.sido;
@@ -493,6 +566,7 @@ document.addEventListener("click", (e) => {
   const gb = e.target.closest("[data-grade]"); if (gb) { gradeInfo(gb.dataset.grade, gb.dataset.gy); return; }
   if (e.target.closest("a[href]")) return;   // 전화·지도 링크는 그대로 동작
   const fb = e.target.closest("[data-fav]"); if (fb) { toggleFav(fb.dataset.fav); return; }
+  const sv = e.target.closest("[data-silver]"); if (sv) { silverDetail(sv.dataset.silver); return; }
   const t = e.target.closest("[data-pick],[data-page],[data-detail]"); if (!t) return;
   if (t.dataset.page) { state.page = Number(t.dataset.page); search(true); }
   if (t.dataset.detail) openDetail(t.dataset.detail);
@@ -893,7 +967,7 @@ async function drawBigMap(rows) {
       const pos = new k.maps.LatLng(p.lat, p.lng); bounds.extend(pos); n++;
       const mk = new k.maps.Marker({ map: bigMap, position: pos, title: r.name }); bigMarkers.push(mk);
       const ov = new k.maps.CustomOverlay({ position: pos, yAnchor: 1.6, content:
-        `<div class="mbub"><b>${esc(r.name)}</b>${r.eval_grade ? ` <span class="b g g${r.eval_grade}">기관평가 ${r.eval_grade}</span>` : ""}<br><span class="muted">${esc(r.kind_nm)}${r.capacity != null ? ` · 정원 ${r.capacity}` : ""}</span><br><button class="btn pri" type="button" data-detail="${r.id}">자세히 보기 ›</button></div>` });
+        `<div class="mbub"><b>${esc(r.name)}</b>${r.eval_grade ? ` <span class="b g g${r.eval_grade}">기관평가 ${r.eval_grade}</span>` : ""}<br><span class="muted">${esc(r.kind_nm)}${r.capacity != null ? ` · ${r.silver && r.kind === "housing" ? "세대" : "정원"} ${r.capacity}` : ""}</span><br><button class="btn pri" type="button" ${r.silver ? `data-silver="${r.sid}"` : `data-detail="${r.id}"`}>자세히 보기 ›</button></div>` });
       k.maps.event.addListener(mk, "click", () => { if (open) open.setMap(null); ov.setMap(bigMap); open = ov; });
     }
     if (myPos) { const me = new k.maps.LatLng(myPos.lat, myPos.lng); bounds.extend(me);
