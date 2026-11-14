@@ -6,6 +6,7 @@
 //  /api/search?id=기관기호:유형코드                           → 1곳 상세
 //  /api/search?ids=기호:유형,기호:유형 (최대 5곳)              → 비교
 //  /api/search?mode=stats&sido=41&sgg=110&kind=daycare          → 창업 참고용 지역 요약 (시도 전체 + 시군구별)
+//  /api/search?mode=silver&sido=41&sgg=110&q=이름                → 실버타운·양로원 목록 (silver_facilities)
 export const config = { maxDuration: 15 };
 const SB_URL = (process.env.SUPABASE_URL ?? "").trim().replace(/\/+$/, "").replace(/\/rest\/v1$/, "");
 const SB_KEY = process.env.SUPABASE_SECRET_KEY ?? "";
@@ -16,6 +17,12 @@ const SORTS = { name: "name.asc", capacity: "capacity.desc.nullslast,name.asc", 
 const LIST_COLS = "sym,pttn,name,kind,sido_cd,sgg_cd,addr,tel,capacity,now_m,now_f,wait_m,wait_f,designated,homepage,detail_at,eval_grade,eval_year";
 const DETAIL_COLS = `${LIST_COLS},addr_detail,post,parking,transport,list_seen,staff,rooms,nonpay,programs,extra_at`;
 const PAGE = 20;
+// 실버타운·양로원 (silver_facilities 표). 시·도 코드는 lib/ltc.js SIDOS와 같음 (12 = 전남광주통합특별시)
+const SILVER_NM = { housing: "실버타운(노인복지주택)", yangro: "양로원(양로시설)", group: "노인공동생활가정" };
+const SILVER_COLS = "id,kind,sido,sgg,name,addr,tel,capacity,current,staff,units_sale,units_rent,units_mixed_sale,units_mixed_rent,est_date,operator,homepage,price_status,price_deposit,price_source,price_checked_at,src";
+const SIDO_FULL = { 11: ["서울특별시"], 26: ["부산광역시"], 27: ["대구광역시"], 28: ["인천광역시"], 30: ["대전광역시"], 31: ["울산광역시"], 36: ["세종특별자치시"],
+  41: ["경기도"], 43: ["충청북도"], 44: ["충청남도"], 47: ["경상북도"], 48: ["경상남도"], 50: ["제주특별자치도"], 51: ["강원특별자치도", "강원도"], 52: ["전북특별자치도", "전라북도"],
+  12: ["전남광주통합특별시", "광주광역시", "전라남도"] };
 
 const sub = (p) => {
   const c = String(p || "").toUpperCase();
@@ -122,6 +129,37 @@ export default async function handler(req, res) {
         sidoStats: addPop(agg(rows), [...pop.values()]),
         sggStats: sgg ? addPop(agg(bySgg.get(sgg) || []), pop.has(sgg) ? [pop.get(sgg)] : []) : null,
         sggs: [...bySgg.entries()].map(([cd, l]) => ({ cd, nm: pop.get(cd)?.sgg_nm || null, ...addPop(agg(l), pop.has(cd) ? [pop.get(cd)] : []) })) });
+    }
+
+    // 1-3) 실버타운·양로원 (노인주거복지시설, 보건복지부 현황 + 가격 조사표)
+    //   /api/search?mode=silver&sido=41&sgg=110&skind=housing&q=이름&sort=name
+    if (q.mode === "silver") {
+      const sido = /^\d{2}$/.test(q.sido || "") ? q.sido : null;
+      const sgg = /^\d{3}$/.test(q.sgg || "") ? q.sgg : null;
+      const name = String(q.q || "").replace(/[*,()%\\.:"'`;=&]/g, " ").trim().slice(0, 30);
+      if (!sido && name.length < 2) return res.status(400).json({ 오류: "시·도를 고르시거나 시설 이름을 2글자 이상 넣어 주시면 됩니다" });
+      const f = [`select=${SILVER_COLS}`];
+      if (sido) {
+        const nms = SIDO_FULL[sido]; if (!nms) return res.status(200).json({ total: 0, page: 1, pages: 1, rows: [] });
+        f.push(`sido=in.(${nms.map((x) => `"${x}"`).join(",")})`);
+        if (sgg) {
+          const { data: g } = await sb(`sgg_names?select=sgg_nm&sido_cd=eq.${sido}&sgg_cd=eq.${sgg}&limit=1`);
+          const nm = String(g[0]?.sgg_nm || "").replace(/[*,()%\\.:"'`;=&]/g, " ").trim();
+          if (nm) f.push(`addr=ilike.${encodeURIComponent(`*${nm.replace(/\s+/g, "*")}*`)}`);
+        }
+      }
+      const sk = String(q.skind || "").split(",").filter((k) => k in SILVER_NM);
+      if (sk.length) f.push(`kind=in.(${sk.join(",")})`);
+      if (name) f.push(`name=ilike.${encodeURIComponent(`*${name.replace(/\s+/g, "*")}*`)}`);
+      // 실버타운(노인복지주택) 먼저, 그다음 양로원·공동생활가정
+      f.push(`order=${q.sort === "capacity" ? "capacity.desc.nullslast,name.asc" : "name.asc"}`, "limit=300");
+      const { data } = await sb(`silver_facilities?${f.join("&")}`);
+      const RANK = { housing: 0, yangro: 1, group: 2 };
+      if (q.sort !== "capacity") data.sort((a, b) => (RANK[a.kind] ?? 9) - (RANK[b.kind] ?? 9));
+      const rows = data.map((r) => ({ ...r, id: `silver-${r.id}`, sid: r.id, silver: true, kind_nm: SILVER_NM[r.kind] || "노인주거복지시설",
+        now: r.current, sale_type: r.kind !== "housing" ? null : (r.units_sale || r.units_mixed_sale) ? ((r.units_rent || r.units_mixed_rent) ? "분양·임대 혼합" : "분양형") : "임대형" }));
+      res.setHeader("Cache-Control", "public, s-maxage=600, stale-while-revalidate=3600");
+      return res.status(200).json({ total: rows.length, page: 1, pages: 1, rows });
     }
 
     // 2) 한 곳 또는 여러 곳(비교)
