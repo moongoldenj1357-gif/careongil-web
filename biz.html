@@ -283,6 +283,28 @@ function grades(o) {
   return `<div class="bars"><b style="font-size:.95rem">기관평가 분포</b>${ks.map((k) => `<div class="bar"><span>${k}</span><i class="${k === "없음" ? "none" : ""}" style="width:${(o.grades[k] / max) * 100}%"></i><span>${num(o.grades[k])}곳</span></div>`).join("")}
     <p class="muted" style="font-size:.82rem;margin:4px 0 0">'없음'은 신규 기관 등 아직 평가 결과가 공개되지 않은 곳입니다.</p></div>`;
 }
+// 평가 등급별 이용률 (같은 지역 안에서 비교)
+function gradeOcc(o, base) {
+  const G = [["A", "A등급"], ["B", "B등급"], ["CDE", "C~E등급"], ["none", "평가 없음"]];
+  const S = base || o, L = base ? o : null;
+  if (!S.gocc || !G.some(([k]) => S.gocc[k]?.cap)) return "";
+  const pc = (g) => (g && g.cap && g.n >= 3 ? g.occ + "%" : "–"), wt = (g) => (g && g.n >= 3 && g.waitPer != null ? g.waitPer + "명" : "–");
+  const rows = G.map(([k, nm]) => { const s = S.gocc[k], l = L?.gocc?.[k]; return `<tr><td>${nm}</td>${L ? `<td>${num(l?.n || 0)}곳</td><td>${pc(l)}</td><td>${wt(l)}</td>` : ""}<td>${num(s?.n || 0)}곳</td><td>${pc(s)}</td><td>${wt(s)}</td></tr>`; }).join("");
+  const a = S.gocc.A, c = S.gocc.CDE;
+  let msg = "";
+  if (a?.n >= 3 && c?.n >= 3 && a.occ != null && c.occ != null) {
+    const d = Math.round((a.occ - c.occ) * 10) / 10;
+    msg = d >= 3 ? `${base ? "시·도 전체로 보면 " : ""}A등급 기관의 이용률(${a.occ}%)이 C~E등급(${c.occ}%)보다 ${d}%p 높고, 기관당 대기도 ${a.waitPer}명 대 ${c.waitPer}명입니다. ${base ? "이 시·도에서는" : "이 지역에서는"} 평가 결과가 이용자 선택과 함께 움직이는 편입니다.`
+      : d <= -3 ? `${base ? "시·도 전체로 보면 " : ""}A등급 기관의 이용률(${a.occ}%)이 C~E등급(${c.occ}%)보다 오히려 낮습니다. 위치·규모 등 다른 요인의 영향이 더 큰 지역으로 보입니다.`
+      : `${base ? "시·도 전체로 보면 " : ""}A등급(${a.occ}%)과 C~E등급(${c.occ}%)의 이용률 차이가 크지 않습니다.`;
+  }
+  const hd = (t) => `<th colspan="3">${t}</th>`;
+  return `<h3 style="margin:18px 0 0;font-size:1rem">평가 등급별 이용률</h3><div class="tbl"><table>
+    <tr><th rowspan="2">등급</th>${L ? hd("이 지역") : ""}${hd(base ? "시·도 전체" : "이 지역")}</tr>
+    <tr>${(L ? ["기관", "이용률", "기관당 대기"] : []).concat(["기관", "이용률", "기관당 대기"]).map((t) => `<th>${t}</th>`).join("")}</tr>${rows}</table></div>
+    ${msg ? `<div class="signal">참고 신호: ${msg} <span class="muted">(등급이 이용률을 정한다는 뜻은 아니며, 함께 나타나는 경향입니다)</span></div>` : ""}
+    <p class="muted" style="font-size:.82rem;margin:4px 0 0">기관이 3곳 미만인 칸은 '–'로 두었습니다. 등급은 공단의 가장 최근 정기·수시평가 결과입니다.</p>`;
+}
 async function run() {
   const sido = $("#sido").value, sgg = $("#sgg").value, kind = $("#kind").value;
   if (!sido) { $("#res").innerHTML = `<p class="note">시·도를 먼저 골라 주시면 됩니다.</p>`; return; }
@@ -312,6 +334,7 @@ async function run() {
     h += `</div>`;
     if (stay) h += signal(o, base);
     h += grades(o);
+    if (stay) h += gradeOcc(o, base);
     if (stay && o.capN < o.n) h += `<p class="muted" style="font-size:.82rem">정원·현원은 상세 자료가 모인 ${num(o.capN)}곳 기준입니다 (전체 ${num(o.n)}곳).</p>`;
     // 시군구별 표
     const list = j.sggs.filter((x) => x.n || x.pop).sort((a, b) => (stay ? (b.occ ?? -1) - (a.occ ?? -1) : b.n - a.n));
