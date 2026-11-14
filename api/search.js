@@ -91,7 +91,7 @@ export default async function handler(req, res) {
       if (!sido || !(kind in KIND_NM) || ["unit", "other", "tool"].includes(kind)) return res.status(400).json({ 오류: "시·도와 기관 종류를 골라 주시면 됩니다" });
       const rows = [];
       for (let off = 0; off < 20000; off += 1000) {
-        const { data } = await sb(`ltc_insts?select=sgg_cd,capacity,now_m,now_f,wait_m,wait_f,eval_grade,designated,detail_at&sido_cd=eq.${sido}&kind=eq.${kind}&order=sym.asc,pttn.asc&limit=1000&offset=${off}`);
+        const { data } = await sb(`ltc_insts?select=sgg_cd,capacity,now_m,now_f,wait_m,wait_f,eval_grade,designated,detail_at${["home", "daycare", "short"].includes(kind) ? ",nonpay" : ""}&sido_cd=eq.${sido}&kind=eq.${kind}&order=sym.asc,pttn.asc&limit=1000&offset=${off}`);
         rows.push(...data);
         if (data.length < 1000) break;
       }
@@ -111,6 +111,10 @@ export default async function handler(req, res) {
           const g = (o.gocc[gb] ||= { n: 0, cap: 0, now: 0, wait: 0 });
           g.n++; if (r.capacity != null && now != null) { g.cap += r.capacity; g.now += now; } if (wait != null) g.wait += wait;
         }
+        // 1식 식재료비 분포 (기관이 공단에 신고한 1식 금액, 여러 개면 가장 큰 금액 = 간식 제외 효과)
+        const fd = list.map((r) => (Array.isArray(r.nonpay) ? Math.max(0, ...r.nonpay.filter((x) => x.종류 === "식재료비").map((x) => +x.금액 || 0)) : 0)).filter((x) => x >= 300 && x <= 30000).sort((x, y) => x - y);
+        const q = (p) => { const i = (fd.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i); return Math.round((fd[lo] + (fd[hi] - fd[lo]) * (i - lo)) / 10) * 10; };
+        o.food = fd.length ? { n: fd.length, p25: q(0.25), med: q(0.5), p75: q(0.75) } : null;
         for (const g of Object.values(o.gocc)) { g.occ = g.cap ? Math.round((g.now / g.cap) * 1000) / 10 : null; g.waitPer = g.n ? Math.round((g.wait / g.n) * 10) / 10 : null; }
         o.occ = o.capacity ? Math.round((o.now / o.capacity) * 1000) / 10 : null;
         o.vacancy = o.capacity ? Math.max(0, o.capacity - o.now) : null;
@@ -135,7 +139,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ sido, sgg, kind, kind_nm: KIND_NM[kind], since, popYm,
         sidoStats: addPop(agg(rows), [...pop.values()]),
         sggStats: sgg ? addPop(agg(bySgg.get(sgg) || []), pop.has(sgg) ? [pop.get(sgg)] : []) : null,
-        sggs: [...bySgg.entries()].map(([cd, l]) => { const { gocc, ...a } = addPop(agg(l), pop.has(cd) ? [pop.get(cd)] : []); return { cd, nm: pop.get(cd)?.sgg_nm || null, ...a }; }) });
+        sggs: [...bySgg.entries()].map(([cd, l]) => { const { gocc, food, ...a } = addPop(agg(l), pop.has(cd) ? [pop.get(cd)] : []); return { cd, nm: pop.get(cd)?.sgg_nm || null, ...a }; }) });
     }
 
     // 1-3) 실버타운·양로원 (노인주거복지시설, 보건복지부 현황 + 가격 조사표)
