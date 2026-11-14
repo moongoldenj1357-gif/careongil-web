@@ -312,7 +312,7 @@ footer p{margin:4px 0}
     <div id="cStay">
       <div class="row three" style="margin-top:10px">
         <div><label class="f" for="cDays">한 달 이용일</label><input class="in" type="number" id="cDays" value="30" min="0" max="31"></div>
-        <div><label class="f" for="cFood">식재료비 (하루, 원)</label><input class="in" type="number" id="cFood" placeholder="예: 7500" min="0"></div>
+        <div><label class="f" for="cFood">식재료비 (하루, 원)</label><input class="in" type="number" id="cFood" placeholder="예: 12000 (1식 4,000원 × 3끼)" min="0"></div>
         <div><label class="f" for="cEtc">기타 비급여 (한 달, 원)</label><input class="in" type="number" id="cEtc" placeholder="이미용·상급침실·간식 등" min="0"></div>
       </div>
     </div>
@@ -542,7 +542,7 @@ function extraHtml(r) {
   return `
     <h4 class="sec">본인이 따로 내는 비용 (비급여)</h4>
     ${np.length ? `<table class="kv">${np.map((x) => `<tr><th>${esc(x.종류)}</th><td><b>${won(x.금액)}</b>${x.근거 ? ` <span class="muted">(${esc(x.근거)})</span>` : ""}${x.등록일 ? `<br><span class="muted">신고일 ${esc(x.등록일)}</span>` : ""}</td></tr>`).join("")}</table>
-      <p class="muted">기관이 공단에 신고한 금액입니다. 하루 기준인지 한 달 기준인지는 괄호 안의 산출근거에서 보실 수 있습니다.</p>`
+      <p class="muted">기관이 공단에 신고한 금액입니다. 식재료비는 보통 1식(한 끼) 금액이고, 하루 몇 끼인지는 괄호 안의 산출근거에서 보실 수 있습니다.</p>`
       : `<p class="muted">신고된 비급여 항목이 없습니다.</p>`}
     <h4 class="sec">일하는 사람</h4>
     <p>${nz(r.staff).map(([k, v]) => `${esc(k)} <b>${v}</b>`).join(" · ") || "–"}</p>
@@ -713,7 +713,7 @@ $("#trayGo").addEventListener("click", async () => {
       ${line("현원", (r) => num(r.now))}
       ${line("빈자리(추정)", (r) => num(r.vacancy))}
       ${line("대기", (r) => num(r.wait))}
-      ${line("식재료비", (r) => (r.food ? `${won(r.food.금액)}<br><span class="muted">${esc(r.food.근거 || "")}</span>` : r.extra_at ? "신고 없음" : "수집 중"))}
+      ${line("식재료비", (r) => (r.food ? `1식 ${won(r.food.금액)}<br><span class="muted">${esc(r.food.근거 || "")}</span>` : r.extra_at ? "신고 없음" : "수집 중"))}
       ${line("기타 비급여", (r) => (Array.isArray(r.nonpay) ? r.nonpay.filter((x) => x.종류 !== "식재료비").map((x) => `${esc(x.종류)} ${won(x.금액)}`).join("<br>") || "–" : "수집 중"))}
       ${line("요양보호사", (r) => (r.care_workers != null ? `${r.care_workers}명` : "–"))}
       ${line("간호(조무)사", (r) => (r.nurses != null ? `${r.nurses}명` : "–"))}
@@ -818,14 +818,22 @@ document.querySelector("#calc").addEventListener("input", calc);
 fillGrades(); calc();
 
 // 기관 상세 → 계산기 (입소형이면 식재료비를 넣어 줌)
+// 공단에 신고된 식재료비 금액은 '1식' 기준입니다(산출근거 예: "1식 4000원 X 3식/일").
+// 하루 금액 = 1식 금액 × 하루 끼니 수(근거에서 읽고, 없으면 요양원 3끼·주야간 1끼로 봄)
+function foodPerDay(r, defMeals) {
+  const f = (r.nonpay || []).find((x) => x.종류 === "식재료비");
+  if (!f || !f.금액 || f.금액 > 30000) return null;
+  const m = String(f.근거 || "").replace(/\s/g, "").match(/[xX×*](\d)식/);
+  const n = m ? +m[1] : defMeals;
+  return n >= 1 && n <= 5 ? f.금액 * n : f.금액 * defMeals;
+}
 function toCalc(r) {
   const stay = r.kind === "home";
   $(`#cMode [data-m="${stay ? "stay" : "home"}"]`).click();
   if (stay) {
     if (r.sub_nm === "공동생활가정") $("#cFac").value = "group";
-    const f = (r.nonpay || []).find((x) => x.종류 === "식재료비");
-    $("#cFood").value = f && f.금액 && f.금액 <= 30000 ? f.금액 : "";
-  } else if (r.kind === "daycare") { $("#cDayN").value = 20; }
+    $("#cFood").value = foodPerDay(r, 3) ?? "";
+  } else if (r.kind === "daycare") { $("#cDayN").value = 20; $("#cMeal").value = foodPerDay(r, 1) ?? ""; }
   calc(); dlg.close(); go("calc");
 }
 
@@ -982,7 +990,7 @@ const FQ = {
   appeal: ["등급이 생각보다 낮게 나오면요?", "판정 결과에 동의하기 어려우시면, 결과를 아신 날부터 90일 안에 국민건강보험공단에 이의신청을 하실 수 있습니다. 시간이 지나 상태가 나빠지셨다면 '등급변경 신청'도 하실 수 있습니다. 반영되지 않았다고 생각하시는 부분의 기록(진료 기록, 돌봄 일지 등)을 모아 두시면 도움이 됩니다.", ["apply", "grades"]],
   grades: ["등급별로 뭐가 달라요?", "1·2등급은 요양원(시설)과 재가 서비스를 모두 이용하실 수 있고, 3~5등급은 주로 재가 서비스를 이용하십니다. 인지지원등급은 주야간보호·단기보호 등은 이용하실 수 있지만 방문요양은 이용하실 수 없습니다. 재가 월 한도액은 1등급 2,512,900원부터 5등급 1,208,900원, 인지지원 676,320원입니다. 등급표는 '이용 안내 · 등급'에서 보실 수 있습니다.", ["stay3", "cost"]],
   cost: ["요양원 비용은 한 달에 얼마예요?", "2026년 기준 요양원 하루 수가는 2등급 86,340원입니다. 일반(20% 부담)이시면 30일 급여 본인부담이 약 51만 8천 원이고, 여기에 식재료비·상급침실료·이미용비 같은 비급여가 더해집니다. 비급여는 기관마다 달라서 기관 상세의 '본인이 따로 내는 비용'에서 보실 수 있고, '비용 계산기'로 직접 계산해 보실 수 있습니다.", ["food", "room", "calc"]],
-  food: ["식재료비는 보통 얼마예요?", "식재료비는 기관마다 정해서 공단에 신고합니다. 케어온길 기관 상세의 '본인이 따로 내는 비용'에서 기관이 신고한 금액과 산출근거(예: 끼니당 금액 × 3회)를 보실 수 있습니다. 비교하실 때는 하루 기준인지 한 달 기준인지 함께 보시면 좋습니다. 식재료비는 감경 없이 전액 본인부담입니다.", ["room", "calc"]],
+  food: ["식재료비는 보통 얼마예요?", "식재료비는 기관마다 정해서 공단에 신고합니다. 케어온길 기관 상세의 '본인이 따로 내는 비용'에서 기관이 신고한 금액과 산출근거(예: 끼니당 금액 × 3회)를 보실 수 있습니다. 공단에 신고된 금액은 1식(한 끼) 기준이라, 하루 비용은 1식 금액에 끼니 수를 곱해 보시면 됩니다. 식재료비는 감경 없이 전액 본인부담입니다.", ["room", "calc"]],
   room: ["1인실·2인실은 더 비싸요?", "네, 기본은 다인실이고 1인실·2인실을 이용하시면 '상급침실사용료'를 따로 내시게 됩니다. 비급여라서 감경 없이 전액 본인부담입니다. 기관마다 금액이 달라서 기관 상세의 비급여 항목에서 확인하실 수 있습니다.", ["food", "calc"]],
   calc: ["한 달 비용을 직접 계산하려면요?", "화면 위 '비용 계산기'에서 어르신 등급, 본인부담 유형(일반·감경), 이용일, 식재료비를 넣으시면 한 달 예상 금액을 보실 수 있습니다. 기관 상세에서 '이 기관 비용 계산'을 누르시면 그 기관이 신고한 식재료비가 들어간 채로 열립니다.", ["reduce", "food"]],
   diff: ["요양원과 주야간보호는 어떻게 달라요?", "요양원은 어르신이 들어가서 생활하시는 시설(시설급여)이고, 원칙적으로 장기요양 1·2등급이 이용하십니다. 주야간보호는 낮 동안(또는 밤 동안) 센터에서 돌봄·식사·프로그램을 받으시고 집으로 돌아오시는 재가 서비스로, 1~5등급과 인지지원등급 모두 이용하실 수 있습니다. 재가는 월 한도 안에서 15%만 부담하시면 됩니다.", ["stay3", "day", "home"]],
