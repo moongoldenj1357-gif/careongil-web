@@ -88,6 +88,20 @@ textarea,input.txt{width:100%;padding:9px 11px;border:1px solid var(--line);bord
 .err{color:#b4472f;font-weight:700}
 .lnk{border:0;background:none;color:var(--main);font-weight:700;cursor:pointer;padding:0;font-size:.92rem;text-decoration:underline}
 .owner{margin:14px 0 0;text-align:right}
+#chatBtn{position:fixed;right:16px;bottom:84px;z-index:20;border:0;border-radius:999px;background:var(--warm);color:#fff;font-weight:700;padding:12px 18px;box-shadow:0 6px 18px rgba(0,0,0,.18);cursor:pointer}
+#chat{position:fixed;right:16px;bottom:16px;z-index:30;width:min(400px,calc(100vw - 32px));height:min(620px,calc(100vh - 32px));background:#fff;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden}
+#chat[hidden]{display:none}
+.ch-h{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--main);color:#fff}.ch-h .x{color:#fff}
+.ch-b{flex:1;overflow-y:auto;padding:14px;background:var(--bg)}
+.msg{max-width:88%;padding:10px 12px;border-radius:14px;margin:0 0 10px;line-height:1.55;font-size:.95rem}
+.msg.bot{background:#fff;border:1px solid var(--line)}.msg.me{background:var(--main);color:#fff;margin-left:auto}
+.faq{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}.msg .faq{margin:8px 0 0}.faq .chip{font-size:.85rem;padding:6px 10px}
+.ailbl{display:inline-block;font-size:.72rem;font-weight:700;color:var(--warm);background:var(--warm-soft);border-radius:6px;padding:1px 6px;margin-bottom:4px}
+.more{display:block;margin-top:10px;font-size:.8rem}
+.ch-ctx{padding:8px 14px;font-size:.85rem;background:var(--warm-soft);border-top:1px solid var(--line)}
+.ch-f{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}
+.ch-f textarea{flex:1;resize:none;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit;margin:0}
+.ch-n{margin:0;padding:0 12px 10px;font-size:.75rem}
 footer{padding:28px 0 40px;color:var(--sub);font-size:.85rem}
 footer p{margin:6px 0}
 </style>
@@ -127,6 +141,21 @@ footer p{margin:6px 0}
   <span><b id="strayN">0</b>/5곳 담음 <button class="btn" type="button" id="strayClear" style="margin-left:6px">비우기</button></span>
   <button class="btn pri" type="button" id="strayGo">비교하기</button>
 </div></div>
+
+<button type="button" id="chatBtn" aria-label="AI 상담 열기">💬 AI 상담</button>
+<section id="chat" hidden aria-label="AI 상담">
+  <div class="ch-h"><b>실버타운·양로원 AI 상담 <small style="font-weight:400;opacity:.85">· 생성형 AI 기반</small></b><button class="x" type="button" id="chatX" aria-label="닫기">×</button></div>
+  <div class="ch-b" id="chatLog">
+    <div class="msg bot">안녕하세요. 실버타운·양로원 고르기, 비용, 계약 때 확인할 점을 편하게 물어봐 주세요. 시설 '자세히 보기'에서 <b>이 시설 AI에게 묻기</b>를 누르시면 케어온길에 저장된 그 시설 정보로 답해 드립니다.<br><span class="muted">아래 자주 묻는 질문은 횟수 제한 없이 바로 보실 수 있습니다.</span></div>
+    <div class="faq" id="faq"></div>
+  </div>
+  <div class="ch-ctx" id="chatCtx" hidden></div>
+  <form class="ch-f" id="chatForm" autocomplete="off">
+    <textarea id="chatIn" rows="2" maxlength="500" placeholder="궁금하신 점을 적어 주세요 (이름·주민번호는 적지 않으셔도 됩니다)"></textarea>
+    <button type="submit" class="btn pri">보내기</button>
+  </form>
+  <p class="ch-n muted" id="chatNote">직접 쓰신 질문은 생성형 AI(Anthropic Claude)가 답하며, 질문은 답변 생성을 위해 미국 Anthropic으로 전송됩니다(<a href="/privacy.html" target="_blank">개인정보처리방침</a>). AI 답변은 참고용이며 계약 조건 확인이나 입주 결정을 대신하지 않습니다. 대화 내용은 저장하지 않습니다. 하루 10번까지 무료로 이용하실 수 있습니다(케어온길 전체 합산).</p>
+</section>
 
 <dialog id="dlg"><div class="dlg-h"><h3 id="dlgT"></h3><button class="x" type="button" aria-label="닫기" onclick="dlg.close()">×</button></div><div class="dlg-b" id="dlgB"></div></dialog>
 
@@ -242,6 +271,7 @@ function silverDetail(sid) {
       : "양로원(양로시설)과 노인공동생활가정은 어르신이 입소해 식사와 일상생활 편의를 받는 시설입니다. 장기요양 서비스를 하는 요양원과는 다릅니다. 소득·나이에 따라 무료·실비·유료로 나뉘니, 입소 조건과 비용은 시설이나 주민센터에 문의하시면 됩니다."}</p>
     <p class="muted">시설 정보: ${esc(r.src || "보건복지부 노인복지시설 현황")} (2025년 말 기준). 지금과 다를 수 있습니다.</p>
     <div class="acts">${r.tel ? `<a class="btn pri" href="tel:${esc(r.tel)}">📞 전화로 문의</a>` : ""}${ml ? `<a class="btn" href="${ml}" target="_blank" rel="noopener noreferrer">지도에서 보기</a>` : ""}</div>
+    <div class="acts"><button class="btn" type="button" data-askai="${r.sid}">💬 이 시설 AI에게 묻기</button></div>
     <p class="owner"><button type="button" class="lnk" data-owner="${r.sid}">이 시설 운영자이신가요? 정보 등록·수정하기 ›</button></p>`);
 }
 function drawSkinds() {
@@ -315,6 +345,7 @@ $("#strayGo").addEventListener("click", async () => {
       ${line("운영 주체", (r) => esc(r.operator || "–"))}
       ${line("", (r) => `<button class="btn" type="button" data-sunpick="${r.sid}">빼기</button>`)}
     </table></div>
+    <div class="acts"><button class="btn pri" type="button" data-askai="${rows.map((r) => r.sid).join(",")}">💬 비교한 곳 AI에게 묻기</button></div>
     <p class="note">보증금과 8가지 항목은 공개 자료나 시설이 보내 준 정보를 옮긴 것이라 지금과 다를 수 있습니다. 평형·인원·식사 횟수에 따라 비용이 크게 달라지니 시설에 문의하시고, 보증금 반환·퇴소 조건은 계약서로 꼭 확인하시길 권해 드립니다.</p>`, true);
   } catch (e) { show("오류", `<p>${esc(e.message)}</p>`); }
 });
@@ -359,6 +390,58 @@ function ownerForm(sid) {
   };
 }
 
+// ---------- AI 상담 (실버타운·양로원) ----------
+const FQ = {
+  diff: ["실버타운과 요양원은 뭐가 달라요?", "실버타운(노인복지주택)은 만 60세 이상 어르신이 보증금과 월 생활비를 내고 <b>스스로 생활하시는 집</b>입니다. 식사, 청소, 건강관리 같은 생활 서비스를 받으시고, 장기요양등급이 없어도 들어가실 수 있습니다. 요양원은 장기요양등급(보통 1·2등급)을 받은 어르신이 <b>돌봄을 받는 시설</b>이라 비용 대부분을 장기요양보험이 냅니다. 돌봄이 많이 필요하시면 케어온길 첫 화면 '기관 찾기'에서 요양원을 찾아보실 수 있습니다.", ["yangro", "care"]],
+  cost: ["실버타운 비용은 어떻게 구성돼요?", "보통 ① 입주 때 내는 <b>보증금</b>(퇴소할 때 돌려받는 돈) ② 매월 내는 <b>관리비·생활비</b> ③ <b>식비</b>(월 30~90끼 의무식이 많음) ④ 전기·수도 같은 개별 사용료로 나뉩니다. 시설마다 '월 생활비'에 식비가 들어가는지가 달라서, 같은 조건(1인, 같은 평형, 식사 포함)으로 맞춰 비교해 보시길 권해 드립니다. 케어온길의 시설 상세와 비교표에서 공개된 금액과 출처를 보실 수 있습니다.", ["deposit", "check"]],
+  deposit: ["보증금은 안전하게 돌려받을 수 있나요?", "계약 전에 ① 전입신고와 확정일자를 받을 수 있는지 ② 보증금 반환보증에 가입되어 있는지 ③ 퇴소 뒤 언제까지 돌려주는지 ④ 중도 해지 때 위약금이 있는지 ⑤ 건강이 나빠져 퇴소할 때 예외가 있는지를 <b>계약서로</b> 확인하시길 권해 드립니다. 운영 회사의 형편이 어려워지면 반환이 늦어질 수 있어서, 이 부분은 꼭 서면으로 받아 두시면 좋습니다.", ["check", "care"]],
+  check: ["계약 전에 꼭 확인할 것은요?", "① 보증금 외 매월 총액(관리비+식비+개별 사용료) ② 의무식 횟수와 결식 공제 ③ 계약 기간과 최소 거주 기간 ④ 보증금 반환 시기와 위약금 ⑤ 간호사 근무 시간과 병원 연계 ⑥ 건강이 나빠졌을 때 계속 사실 수 있는지 ⑦ 청소·세탁 횟수를 여쭤보시면 좋습니다. 가능하면 체험 입주를 해 보시고, 식사 시간에 식당 분위기도 살펴보시길 권해 드립니다.", ["deposit", "care"]],
+  care: ["건강이 나빠지면 어떻게 되나요?", "실버타운은 대부분 독립생활이 가능한 분을 위한 곳이라, 돌봄이 많이 필요해지면 퇴소하시거나 단지 안·연계 요양시설로 옮기셔야 할 수 있습니다. 시설마다 기준이 달라서 '어느 정도가 되면 퇴소해야 하는지', '그때 보증금 위약금이 면제되는지'를 미리 물어보시길 권해 드립니다. 장기요양등급을 받으시면 방문요양 같은 재가 서비스를 실버타운 안에서 함께 이용하실 수 있는 경우도 있습니다.", ["deposit", "diff"]],
+  yangro: ["양로원은 누가 들어갈 수 있나요?", "양로원(양로시설)은 일상생활에 지장이 없는 만 65세 이상 어르신이 입소해 식사와 생활 편의를 받는 곳입니다. 생계·의료급여 수급자 등은 <b>무료</b>, 소득이 일정 기준 이하이면 <b>실비</b>, 그 밖에는 <b>유료</b>로 이용하십니다. 무료 입소는 주소지 주민센터에, 실비·유료는 시설에 신청하시면 됩니다. 정확한 조건은 시설이나 주민센터에 문의해 보시길 권해 드립니다.", ["diff", "check"]],
+};
+const FAQ_TOP = ["diff", "cost", "deposit", "check", "care", "yangro"];
+const chips = (keys) => `<div class="faq">${keys.map((k) => `<button type="button" class="chip" data-faq="${k}">${esc(FQ[k][0])}</button>`).join("")}</div>`;
+let chatHist = [], chatCtx = [], chatBusy = false;
+$("#faq").outerHTML = chips(FAQ_TOP);
+const chatAdd = (who, html) => { const d = document.createElement("div"); d.className = "msg " + who; d.innerHTML = html; $("#chatLog").appendChild(d); $("#chatLog").scrollTop = 1e9; return d; };
+const fmt = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>");
+$("#chatLog").addEventListener("click", (e) => {
+  const k = e.target.dataset?.faq; if (!k || !FQ[k]) return;
+  const [q, a, next] = FQ[k];
+  chatAdd("me", esc(q)); chatAdd("bot", a + `<span class="more muted">이어서 많이 묻는 질문</span>` + chips(next));
+});
+function openChat(ids) {
+  chatCtx = (ids || []).map(String).filter((id) => silverCache.has(id)).slice(0, 5);
+  const names = chatCtx.map((id) => silverCache.get(id).name);
+  $("#chatCtx").hidden = !chatCtx.length;
+  $("#chatCtx").innerHTML = chatCtx.length ? `보고 있는 시설: <b>${names.map(esc).join(", ")}</b> <button type="button" class="lnk" id="ctxX">빼기</button>` : "";
+  if (dlg.open) dlg.close();
+  $("#chat").hidden = false; $("#chatBtn").hidden = true;
+  if (chatCtx.length && !chatHist.length) chatAdd("bot", `<b>${names.map(esc).join(", ")}</b>에 대해 궁금하신 점을 적어 주세요. 예: "보증금 외에 매월 얼마가 드나요?", "거동이 불편해지면 계속 살 수 있나요?"`);
+  setTimeout(() => $("#chatIn").focus(), 50);
+}
+$("#chatBtn").addEventListener("click", () => openChat([]));
+$("#chatX").addEventListener("click", () => { $("#chat").hidden = true; $("#chatBtn").hidden = false; });
+$("#chatCtx").addEventListener("click", (e) => { if (e.target.id === "ctxX") { chatCtx = []; $("#chatCtx").hidden = true; } });
+$("#chatIn").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("#chatForm").requestSubmit(); } });
+$("#chatForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const q = $("#chatIn").value.trim(); if (!q || chatBusy) return;
+  chatBusy = true; $("#chatIn").value = "";
+  chatAdd("me", esc(q)); chatHist.push({ role: "user", content: q });
+  const wait = chatAdd("bot", `<span class="muted">답변을 준비하고 있습니다…</span>`);
+  try {
+    const r = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: chatHist.slice(-10), scope: "silver", sctx: chatCtx }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { chatHist.pop(); wait.innerHTML = esc(j.오류 || "잠시 후 다시 시도해 주시기 바랍니다."); }
+    else {
+      wait.innerHTML = `<span class="ailbl">AI 답변</span>` + fmt(j.reply); chatHist.push({ role: "assistant", content: j.reply });
+      if (j.left != null) $("#chatNote").textContent = `직접 쓰신 질문은 생성형 AI(Anthropic Claude)가 답합니다. AI 답변은 참고용이며 계약 조건 확인이나 입주 결정을 대신하지 않습니다. 오늘 남은 횟수는 ${j.left}번입니다.`;
+    }
+  } catch { chatHist.pop(); wait.innerHTML = "연결이 끊겼습니다. 다시 보내 주시기 바랍니다."; }
+  chatBusy = false; $("#chatLog").scrollTop = 1e9;
+});
+
 document.addEventListener("click", (e) => {
   if (e.target.closest("a[href]")) return;
   const sp = e.target.closest("[data-spick]");
@@ -369,6 +452,7 @@ document.addEventListener("click", (e) => {
     else spicks.push(id);
     saveSpicks(); setSpickBtns(id); return;
   }
+  const ak = e.target.closest("[data-askai]"); if (ak) { openChat(ak.dataset.askai.split(",")); return; }
   const ow = e.target.closest("[data-owner]"); if (ow) { ownerForm(ow.dataset.owner); return; }
   const sv = e.target.closest("[data-silver]"); if (sv) silverDetail(sv.dataset.silver);
 });
