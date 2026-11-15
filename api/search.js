@@ -115,6 +115,22 @@ export default async function handler(req, res) {
         const fd = list.map((r) => (Array.isArray(r.nonpay) ? Math.max(0, ...r.nonpay.filter((x) => x.종류 === "식재료비").map((x) => +x.금액 || 0)) : 0)).filter((x) => x >= 300 && x <= 30000).sort((x, y) => x - y);
         const q = (p) => { const i = (fd.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i); return Math.round((fd[lo] + (fd[hi] - fd[lo]) * (i - lo)) / 10) * 10; };
         o.food = fd.length ? { n: fd.length, p25: q(0.25), med: q(0.5), p75: q(0.75) } : null;
+        // 상급침실사용료 (하루 금액으로 신고됨, 예: "10000원 (일)"). 0원·한 달 금액·이상값은 뺌. 1인실/2인실 이름이 있으면 나눔
+        const dist = (arr) => { arr.sort((x, y) => x - y); const qq = (p) => { const i = (arr.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i); return Math.round((arr[lo] + (arr[hi] - arr[lo]) * (i - lo)) / 100) * 100; }; return arr.length ? { n: arr.length, p25: qq(0.25), med: qq(0.5), p75: qq(0.75) } : null; };
+        const rm = { r1: [], r2: [], all: [] };
+        for (const r of list) {
+          if (!Array.isArray(r.nonpay)) continue;
+          const seen = {};
+          for (const x of r.nonpay) {
+            if (!/침실/.test(x.종류 || "") || /월/.test(x.근거 || "")) continue;
+            const v = +x.금액 || 0; if (v < 1000 || v > 150000) continue;
+            const t = /1\s*인/.test(x.종류 + (x.근거 || "")) ? "r1" : /2\s*인/.test(x.종류 + (x.근거 || "")) ? "r2" : "any";
+            seen[t] = Math.max(seen[t] || 0, v);
+          }
+          if (seen.r1) rm.r1.push(seen.r1); if (seen.r2) rm.r2.push(seen.r2);
+          const top = Math.max(0, ...Object.values(seen)); if (top) rm.all.push(top);
+        }
+        o.room = rm.all.length ? { all: dist(rm.all), r1: dist(rm.r1), r2: dist(rm.r2) } : null;
         for (const g of Object.values(o.gocc)) { g.occ = g.cap ? Math.round((g.now / g.cap) * 1000) / 10 : null; g.waitPer = g.n ? Math.round((g.wait / g.n) * 10) / 10 : null; }
         o.occ = o.capacity ? Math.round((o.now / o.capacity) * 1000) / 10 : null;
         o.vacancy = o.capacity ? Math.max(0, o.capacity - o.now) : null;
@@ -139,7 +155,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ sido, sgg, kind, kind_nm: KIND_NM[kind], since, popYm,
         sidoStats: addPop(agg(rows), [...pop.values()]),
         sggStats: sgg ? addPop(agg(bySgg.get(sgg) || []), pop.has(sgg) ? [pop.get(sgg)] : []) : null,
-        sggs: [...bySgg.entries()].map(([cd, l]) => { const { gocc, food, ...a } = addPop(agg(l), pop.has(cd) ? [pop.get(cd)] : []); return { cd, nm: pop.get(cd)?.sgg_nm || null, ...a }; }) });
+        sggs: [...bySgg.entries()].map(([cd, l]) => { const { gocc, food, room, ...a } = addPop(agg(l), pop.has(cd) ? [pop.get(cd)] : []); return { cd, nm: pop.get(cd)?.sgg_nm || null, ...a }; }) });
     }
 
     // 1-3) 실버타운·양로원 (노인주거복지시설, 보건복지부 현황 + 가격 조사표)
