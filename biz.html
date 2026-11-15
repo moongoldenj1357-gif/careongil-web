@@ -295,6 +295,21 @@ function foodDist(o, base, kind) {
     ${L ? row("이 지역", L.food) : ""}${row(base ? "시·도 전체" : "이 지역", S.food)}</table></div>
     <p class="muted" style="font-size:.82rem;margin:4px 0 0">식재료비는 비급여(전액 본인부담)로 기관이 정해 공단에 신고합니다. 가운데 50% 기관이 하위 25%~상위 25% 사이에 있습니다. 가격을 정하실 때 지역 수준을 가늠하는 참고용이며, 식단·간식 포함 여부에 따라 다릅니다.</p>`;
 }
+// 상급침실사용료 분포 (기관 신고, 하루 금액)
+function roomDist(o, base) {
+  const S = base || o, L = base ? o : null;
+  if (!S.room || !(S.room.all?.n >= 3)) return "";
+  const w = (x) => num(x) + "원";
+  const rows = [];
+  const add = (nm, f) => { if (f && f.n >= 3) rows.push(`<tr><td>${nm}</td><td>${num(f.n)}곳</td><td>${w(f.p25)}</td><td><b>${w(f.med)}</b></td><td>${w(f.p75)}</td><td>${w(f.med * 30)}</td></tr>`); };
+  if (L?.room) add("이 지역", L.room.all);
+  add(base ? "시·도 전체" : "이 지역", S.room.all);
+  if (S.room.r1?.n >= 3) add((base ? "시·도" : "이 지역") + " · 1인실", S.room.r1);
+  if (S.room.r2?.n >= 3) add((base ? "시·도" : "이 지역") + " · 2인실", S.room.r2);
+  return `<h3 style="margin:18px 0 0;font-size:1rem">상급침실사용료 (1·2인실, 하루 금액)</h3><div class="tbl"><table>
+    <tr><th></th><th>신고 기관</th><th>하위 25%</th><th>중간값</th><th>상위 25%</th><th>한 달 어림 (중간값×30일)</th></tr>${rows.join("")}</table></div>
+    <p class="muted" style="font-size:.82rem;margin:4px 0 0">다인실이 기본이고 1·2인실을 쓰면 하루 단위로 따로 받는 비급여입니다. 0원으로 신고한 기관은 뺐고, 여러 금액을 신고한 기관은 가장 높은 금액(보통 1인실)으로 셌습니다.</p>`;
+}
 // 평가 등급별 이용률 (같은 지역 안에서 비교)
 function gradeOcc(o, base) {
   const G = [["A", "A등급"], ["B", "B등급"], ["CDE", "C~E등급"], ["none", "평가 없음"]];
@@ -348,6 +363,7 @@ async function run() {
     h += grades(o);
     if (stay) h += gradeOcc(o, base);
     if (stay) h += foodDist(o, base, kind);
+    if (stay && kind !== "daycare") h += roomDist(o, base);
     if (stay && o.capN < o.n) h += `<p class="muted" style="font-size:.82rem">정원·현원은 상세 자료가 모인 ${num(o.capN)}곳 기준입니다 (전체 ${num(o.n)}곳).</p>`;
     // 시군구별 표
     const list = j.sggs.filter((x) => x.n || x.pop).sort((a, b) => (stay ? (b.occ ?? -1) - (a.occ ?? -1) : b.n - a.n));
