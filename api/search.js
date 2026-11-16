@@ -115,22 +115,16 @@ export default async function handler(req, res) {
         const fd = list.map((r) => (Array.isArray(r.nonpay) ? Math.max(0, ...r.nonpay.filter((x) => x.종류 === "식재료비").map((x) => +x.금액 || 0)) : 0)).filter((x) => x >= 300 && x <= 30000).sort((x, y) => x - y);
         const q = (p) => { const i = (fd.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i); return Math.round((fd[lo] + (fd[hi] - fd[lo]) * (i - lo)) / 10) * 10; };
         o.food = fd.length ? { n: fd.length, p25: q(0.25), med: q(0.5), p75: q(0.75) } : null;
-        // 상급침실사용료 (하루 금액으로 신고됨, 예: "10000원 (일)"). 0원·한 달 금액·이상값은 뺌. 1인실/2인실 이름이 있으면 나눔
+        // 상급침실사용료 (하루 금액으로 신고됨, 예: "10000원 (일)"). 0원·한 달 금액·이상값은 뺌
         const dist = (arr) => { arr.sort((x, y) => x - y); const qq = (p) => { const i = (arr.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i); return Math.round((arr[lo] + (arr[hi] - arr[lo]) * (i - lo)) / 100) * 100; }; return arr.length ? { n: arr.length, p25: qq(0.25), med: qq(0.5), p75: qq(0.75) } : null; };
-        const rm = { r1: [], r2: [], all: [] };
+        // 기관마다 상급침실료를 여러 개 신고하는데 방 종류(1인실·2인실)는 적혀 있지 않음 → 기관별 가장 낮은/높은 금액 분포
+        const lo = [], hi = [];
         for (const r of list) {
           if (!Array.isArray(r.nonpay)) continue;
-          const seen = {};
-          for (const x of r.nonpay) {
-            if (!/침실/.test(x.종류 || "") || /월/.test(x.근거 || "")) continue;
-            const v = +x.금액 || 0; if (v < 1000 || v > 150000) continue;
-            const t = /1\s*인/.test(x.종류 + (x.근거 || "")) ? "r1" : /2\s*인/.test(x.종류 + (x.근거 || "")) ? "r2" : "any";
-            seen[t] = Math.max(seen[t] || 0, v);
-          }
-          if (seen.r1) rm.r1.push(seen.r1); if (seen.r2) rm.r2.push(seen.r2);
-          const top = Math.max(0, ...Object.values(seen)); if (top) rm.all.push(top);
+          const v = r.nonpay.filter((x) => /침실/.test(x.종류 || "") && !/월/.test(x.근거 || "")).map((x) => +x.금액 || 0).filter((x) => x >= 1000 && x <= 150000);
+          if (v.length) { lo.push(Math.min(...v)); hi.push(Math.max(...v)); }
         }
-        o.room = rm.all.length ? { all: dist(rm.all), r1: dist(rm.r1), r2: dist(rm.r2) } : null;
+        o.room = lo.length ? { lo: dist(lo), hi: dist(hi), multi: hi.filter((x, k) => x !== lo[k]).length } : null;
         for (const g of Object.values(o.gocc)) { g.occ = g.cap ? Math.round((g.now / g.cap) * 1000) / 10 : null; g.waitPer = g.n ? Math.round((g.wait / g.n) * 10) / 10 : null; }
         o.occ = o.capacity ? Math.round((o.now / o.capacity) * 1000) / 10 : null;
         o.vacancy = o.capacity ? Math.max(0, o.capacity - o.now) : null;
