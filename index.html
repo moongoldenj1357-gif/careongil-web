@@ -542,7 +542,7 @@ function extraHtml(r) {
   return `
     <h4 class="sec">본인이 따로 내는 비용 (비급여)</h4>
     ${np.length ? `<table class="kv">${np.map((x) => `<tr><th>${esc(x.종류)}</th><td><b>${won(x.금액)}</b>${x.근거 ? ` <span class="muted">(${esc(x.근거)})</span>` : ""}${x.등록일 ? `<br><span class="muted">신고일 ${esc(x.등록일)}</span>` : ""}</td></tr>`).join("")}</table>
-      <p class="muted">기관이 공단에 신고한 금액입니다. 식재료비는 보통 1식(한 끼) 금액이고, 하루 몇 끼인지는 괄호 안의 산출근거에서 보실 수 있습니다.</p>`
+      <p class="muted">기관이 공단에 신고한 금액입니다. 식재료비는 보통 1식(한 끼) 금액이고, 하루 몇 끼인지는 괄호 안의 산출근거에서 보실 수 있습니다. 상급침실사용료는 하루 금액이며, 여러 개일 때 어느 방(1인실·2인실 등)의 금액인지는 시설에 확인해 주세요.</p>`
       : `<p class="muted">신고된 비급여 항목이 없습니다.</p>`}
     <h4 class="sec">일하는 사람</h4>
     <p>${nz(r.staff).map(([k, v]) => `${esc(k)} <b>${v}</b>`).join(" · ") || "–"}</p>

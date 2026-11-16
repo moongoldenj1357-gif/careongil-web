@@ -298,17 +298,17 @@ function foodDist(o, base, kind) {
 // 상급침실사용료 분포 (기관 신고, 하루 금액)
 function roomDist(o, base) {
   const S = base || o, L = base ? o : null;
-  if (!S.room || !(S.room.all?.n >= 3)) return "";
-  const w = (x) => num(x) + "원";
-  const rows = [];
+  if (!S.room || !(S.room.lo?.n >= 3)) return "";
+  const w = (x) => num(x) + "원", rows = [];
   const add = (nm, f) => { if (f && f.n >= 3) rows.push(`<tr><td>${nm}</td><td>${num(f.n)}곳</td><td>${w(f.p25)}</td><td><b>${w(f.med)}</b></td><td>${w(f.p75)}</td><td>${w(f.med * 30)}</td></tr>`); };
-  if (L?.room) add("이 지역", L.room.all);
-  add(base ? "시·도 전체" : "이 지역", S.room.all);
-  if (S.room.r1?.n >= 3) add((base ? "시·도" : "이 지역") + " · 1인실", S.room.r1);
-  if (S.room.r2?.n >= 3) add((base ? "시·도" : "이 지역") + " · 2인실", S.room.r2);
-  return `<h3 style="margin:18px 0 0;font-size:1rem">상급침실사용료 (1·2인실, 하루 금액)</h3><div class="tbl"><table>
+  for (const [nm, R] of [[L ? "이 지역" : null, L?.room], [base ? "시·도 전체" : "이 지역", S.room]]) {
+    if (!nm || !R) continue;
+    add(`${nm} · 가장 낮은 금액`, R.lo);
+    if (R.multi >= 3) add(`${nm} · 가장 높은 금액`, R.hi);
+  }
+  return `<h3 style="margin:18px 0 0;font-size:1rem">상급침실사용료 (하루 금액)</h3><div class="tbl"><table>
     <tr><th></th><th>신고 기관</th><th>하위 25%</th><th>중간값</th><th>상위 25%</th><th>한 달 어림 (중간값×30일)</th></tr>${rows.join("")}</table></div>
-    <p class="muted" style="font-size:.82rem;margin:4px 0 0">다인실이 기본이고 1·2인실을 쓰면 하루 단위로 따로 받는 비급여입니다. 0원으로 신고한 기관은 뺐고, 여러 금액을 신고한 기관은 가장 높은 금액(보통 1인실)으로 셌습니다.</p>`;
+    <p class="muted" style="font-size:.82rem;margin:4px 0 0">다인실이 기본이고 1·2인실 같은 상급침실을 쓰면 하루 단위로 따로 받는 비급여입니다. 기관마다 금액을 여러 개 신고하지만 어느 방(1인실·2인실 등)의 금액인지는 신고에 적혀 있지 않아, 기관별 가장 낮은 금액과 가장 높은 금액으로 나눠 보여 드립니다. 0원으로 신고한 금액은 뺐습니다.</p>`;
 }
 // 평가 등급별 이용률 (같은 지역 안에서 비교)
 function gradeOcc(o, base) {
