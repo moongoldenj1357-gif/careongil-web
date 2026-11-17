@@ -3,7 +3,7 @@
 //  GET  /api/admin?list=1                         → 신청 목록 (최근 200건) + 카톡 연결 상태
 //  POST /api/admin {action:"approve", no}         → 입금 확인 → 보고서 만들어 '완료'
 //  POST /api/admin {action:"rebuild", no}         → 보고서 다시 만들기
-//  POST /api/admin {action:"cancel", no}          → 신청 취소
+//  POST /api/admin {action:"cancel", no}          → 신청 취소 (카드·간편결제였으면 토스 결제 취소 = 전액 환불)
 //  POST /api/admin {action:"kakaoUrl"}            → 카톡 알림 연결 주소
 //  POST /api/admin {action:"kakaoTest"}           → 카톡 시험 전송
 //  POST /api/admin {action:"silverApprove", id}   → 실버타운 시설이 보낸 정보 승인 → 공개 (silver_facilities.info)
@@ -13,6 +13,7 @@ import crypto from "node:crypto";
 import { sb, kvGet, kvSet, SB_URL, SB_KEY } from "../lib/db.js";
 import { buildReport, PRODUCTS, KIND_NM } from "../lib/report.js";
 import * as kakao from "../lib/kakao.js";
+import * as toss from "../lib/toss.js";
 
 export const config = { maxDuration: 60 };
 const page = (msg) => `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:sans-serif;padding:24px;line-height:1.6"><p>${msg}</p><p><a href="/admin">관리자 화면으로</a></p>`;
@@ -39,7 +40,7 @@ export default async function handler(req, res) {
     if (!want || code.length !== want.length || !crypto.timingSafeEqual(Buffer.from(code), Buffer.from(want))) return res.status(403).json({ 오류: "관리자 코드가 맞지 않습니다" });
 
     if (req.method === "GET") {
-      const rows = await sb("report_orders?select=no,product,amount,status,region_nm,kind,inputs,name,phone,email,receipt,report_err,created_at,done_at,token&order=created_at.desc&limit=200");
+      const rows = await sb("report_orders?select=no,product,amount,status,region_nm,kind,inputs,name,phone,email,receipt,report_err,created_at,done_at,token,pay_method,paid_at,pay_info&order=created_at.desc&limit=200");
       // 실버타운 시설이 보낸 정보 (확인 대기)
       let silver = [];
       try {
@@ -85,7 +86,13 @@ export default async function handler(req, res) {
     if (!o) return res.status(404).json({ 오류: "신청이 없습니다" });
 
     if (b.action === "cancel") {
-      await sb(`report_orders?no=eq.${no}`, { method: "PATCH", body: { status: "canceled" }, prefer: "return=minimal" });
+      if (o.status === "canceled") return res.status(400).json({ 오류: "이미 취소된 신청입니다" });
+      let pay_info = o.pay_info;
+      if (o.pay_key) { // 카드·간편결제 → 토스에서 결제 취소(전액 환불)
+        const c = await toss.cancel(o.pay_key, String(b.reason || "고객 요청에 따른 취소"));
+        pay_info = { ...(o.pay_info || {}), canceledAt: new Date().toISOString(), cancelStatus: c.status || null };
+      }
+      await sb(`report_orders?no=eq.${no}`, { method: "PATCH", body: { status: "canceled", pay_info }, prefer: "return=minimal" });
       return res.status(200).json({ ok: true });
     }
     if (b.action === "approve" || b.action === "rebuild") {

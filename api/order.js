@@ -3,11 +3,12 @@
 //  GET  /api/order?t=열쇠               → 신청 상태
 //  GET  /api/order?t=열쇠&report=1      → 발행된 보고서 내용 (완료된 경우만)
 //  POST /api/order {find:{no, phone}}   → 신청번호 + 휴대폰으로 열쇠 찾기
-// 환경변수: BANK_INFO (예: "국민은행 000-00-0000 주식회사 벤투런"), LAUNCH_HALF (오픈 기념 반값 인원, 기본 20, 0이면 끔)
+// 환경변수: BANK_INFO (예: "국민은행 000-00-0000 주식회사 벤투런"), LAUNCH_HALF (오픈 기념 반값 인원, 기본 0 = 끔), TOSS_CLIENT_KEY·TOSS_SECRET_KEY (카드·간편결제, lib/toss.js)
 import crypto from "node:crypto";
 import { sb, SB_URL, SB_KEY } from "../lib/db.js";
 import { PRODUCTS, KIND_NM } from "../lib/report.js";
 import { memo } from "../lib/kakao.js";
+import * as toss from "../lib/toss.js";
 
 export const config = { maxDuration: 15 };
 const won = (n) => Number(n).toLocaleString("ko-KR") + "원";
@@ -21,6 +22,9 @@ function pub(o) {
     no: o.no, product: o.product, product_nm: PRODUCTS[o.product]?.nm, amount: o.amount, status: o.status,
     region_nm: o.region_nm, kind_nm: KIND_NM[o.kind] || o.kind, created_at: o.created_at, done_at: o.done_at,
     depositor: depositor(o), bank: bank(), name: o.name.slice(0, 1) + "*".repeat(Math.max(1, o.name.length - 1)),
+    pay_method: o.pay_method || "bank", paid_at: o.paid_at || null, pay_receipt: o.pay_info?.receipt || null,
+    // 카드·간편결제(토스 결제위젯)에 필요한 공개 값
+    toss: toss.ready() && o.status === "requested" ? { clientKey: toss.clientKey(), orderId: toss.orderIdOf(o.no), orderName: `케어온길 ${PRODUCTS[o.product]?.nm || "리포트"}`, test: toss.isTest() } : null,
   };
 }
 const depositor = (o) => `${o.name.replace(/\s/g, "").slice(0, 4)}${o.no.slice(-4)}`;
@@ -94,7 +98,7 @@ export default async function handler(req, res) {
     if (pend.length >= 3) return res.status(429).json({ 오류: "입금 전 신청이 3건 있습니다. 기존 신청을 먼저 마무리해 주세요" });
 
     // 가격 (오픈 기념 반값)
-    const half = Math.max(0, parseInt(process.env.LAUNCH_HALF ?? "20", 10) || 0);
+    const half = Math.max(0, parseInt(process.env.LAUNCH_HALF ?? "0", 10) || 0);
     let amount = PRODUCTS[product].price;
     if (half) {
       const used = await sb(`report_orders?select=no&status=eq.done&limit=${half}`);
