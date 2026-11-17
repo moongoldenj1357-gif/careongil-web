@@ -135,7 +135,6 @@ footer p{margin:6px 0}
       <tr><td>공급·경쟁</td><td>규모별·평가 등급별 분석, 정원 상위 10곳</td><td>+ 기관 전체 목록 (정원·현원·대기·요양보호사·평가 이력)</td><td>+ <b>예정지 주소 반경 1·2·3km 경쟁 기관</b></td></tr>
       <tr><td>손익</td><td>표준 가정 (정원 3가지)</td><td>+ 개원 후 운영자금 (표준 가정)</td><td><b>내 조건(정원·임대료·인건비·초기 투자)</b>으로 손익분기점, 운영자금, 조건 변화표, 인력 점검</td></tr>
     </table></div>
-    <p class="note" style="background:var(--main-soft)"><b>오픈 기념:</b> 처음 발행되는 20건까지는 반값(기본 16,500원 · 상세 27,500원 · 맞춤형 49,500원)입니다. 신청하시면 입금하실 금액이 바로 나옵니다.</p>
 
     <form id="of" autocomplete="on" novalidate>
       <h3 style="margin:18px 0 6px;font-size:1rem">① 상품</h3>
@@ -171,7 +170,7 @@ footer p{margin:6px 0}
         <div><label class="f" for="oPhone">휴대폰 *</label><input type="tel" id="oPhone" class="txt" maxlength="13" autocomplete="tel" placeholder="010-0000-0000"></div>
         <div><label class="f" for="oEmail">이메일 (선택)</label><input type="email" id="oEmail" class="txt" maxlength="80" autocomplete="email"></div>
       </div>
-      <label class="f" style="margin-top:10px">증빙</label>
+      <label class="f" style="margin-top:10px">증빙 (계좌 입금 시. 카드·간편결제는 카드 매출전표가 증빙입니다)</label>
       <div class="pick">
         <label><input type="radio" name="rc" value="none" checked> 필요 없음</label>
         <label><input type="radio" name="rc" value="cash"> 현금영수증</label>
@@ -189,12 +188,12 @@ footer p{margin:6px 0}
         <label><input type="checkbox" id="ag2"> <b>[필수] 아래 환불·취소 안내를 확인했습니다</b></label>
       </div>
       <p class="err" id="oErr"></p>
-      <button type="submit" class="go" id="oGo">신청하고 입금 안내 받기</button>
+      <button type="submit" class="go" id="oGo">신청하고 결제하기</button>
     </form>
     <p class="muted" style="font-size:.85rem;margin:10px 0 0">이미 신청하셨나요? <a href="/order">신청 확인 · 보고서 보기 ›</a></p>
     <details style="margin-top:14px"><summary style="cursor:pointer;font-weight:700">결제·증빙 자주 묻는 질문</summary>
       <dl class="faq">
-        <dt>카드로 결제할 수 있나요?</dt><dd>지금은 계좌이체(무통장 입금)만 받습니다. 신청하시면 입금 계좌와 입금자명이 바로 나옵니다.</dd>
+        <dt>어떻게 결제하나요?</dt><dd>신청하시면 결제 화면으로 넘어갑니다. <b>신용·체크카드와 간편결제</b>(토스페이·네이버페이·페이코 등)로 바로 결제하시거나, <b>계좌 입금</b>을 고르실 수 있습니다. 카드·간편결제는 결제가 끝나면 보고서가 바로 발행됩니다.</dd>
         <dt>법인(사업자)인데 세금계산서를 받을 수 있나요?</dt><dd>네. 신청서 '증빙'에서 <b>세금계산서</b>를 고르시고 사업자등록번호·상호·받으실 이메일을 적어 주시면, 입금 확인 뒤 전자세금계산서를 발행해 드립니다.</dd>
         <dt>현금영수증은요?</dt><dd>네. <b>현금영수증</b>을 고르시고 휴대폰 번호(소득공제용) 또는 사업자등록번호(지출증빙용)를 적어 주시면 발행해 드립니다.</dd>
         <dt>세금계산서와 현금영수증을 둘 다 받을 수 있나요?</dt><dd>같은 거래에는 둘 중 하나만 발행할 수 있습니다.</dd>
@@ -450,7 +449,7 @@ $("#of").addEventListener("submit", async (e) => {
     const j = await r.json().catch(() => ({}));
     if (!r.ok || !j.t) throw new Error(j.오류 || "신청하지 못했습니다. 잠시 뒤 다시 해 주세요");
     location.href = "/order?t=" + encodeURIComponent(j.t);
-  } catch (er) { err(er.message); $("#oGo").disabled = false; $("#oGo").textContent = "신청하고 입금 안내 받기"; }
+  } catch (er) { err(er.message); $("#oGo").disabled = false; $("#oGo").textContent = "신청하고 결제하기"; }
 });
 
 document.addEventListener("click", (e) => { if (e.target.closest("[data-info]")) $("#info").showModal(); });

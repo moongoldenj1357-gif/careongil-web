@@ -30,6 +30,11 @@ input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10
 .row span:first-child{color:var(--sub)}
 .copy{border:1px solid var(--line);background:#fff;border-radius:8px;padding:2px 8px;font-size:.8rem;cursor:pointer;margin-left:6px}
 .err{color:#b4472f}
+.ok{background:var(--main-soft);border-radius:12px;padding:12px 14px;margin:10px 0}
+.pm{display:flex;gap:6px;margin:12px 0 4px}
+.pm button{flex:1;border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px;font:inherit;cursor:pointer}
+.pm button.on{border-color:var(--main);background:var(--main-soft);font-weight:700}
+#payment-method,#agreement{margin:0 -8px}
 </style>
 </head>
 <body>
@@ -64,19 +69,69 @@ async function load() {
     <div class="row"><span>지역 · 종류</span><span>${esc(o.region_nm)} · ${esc(o.kind_nm)}</span></div>
     <div class="row"><span>신청자</span><span>${esc(o.name)}</span></div>
     <div class="row"><span>신청일</span><span>${new Date(o.created_at).toLocaleString("ko-KR")}</span></div>
-    <div class="steps"><div class="on">① 신청 접수</div><div class="${st === "requested" ? "on" : ""}">② 입금 확인 중</div><div class="${done ? "on" : ""}">③ 발행 완료</div></div>`;
-  if (st === "canceled") h += `<p class="err">이 신청은 취소되었습니다. 궁금하신 점은 031-818-6336으로 연락 주세요.</p>`;
-  else if (done) h += `<p><b>보고서가 발행되었습니다.</b> 아래 버튼으로 보시고, 'PDF로 저장'을 누르시면 파일로 보관하실 수 있습니다.</p><a class="btn" href="/report?t=${encodeURIComponent(t)}">📄 보고서 보기</a>`;
-  else h += `<div class="pay"><p style="margin:0 0 8px">아래 계좌로 입금해 주시면, 확인하는 대로 보고서가 바로 발행됩니다. (평일 오전 9시~오후 9시에는 보통 30분 안)</p>
+    <div class="steps"><div class="on">① 신청 접수</div><div class="${st === "requested" || st === "paid" ? "on" : ""}">② 결제 확인</div><div class="${done ? "on" : ""}">③ 발행 완료</div></div>`;
+  const q = new URLSearchParams(location.search);
+  if (q.get("payerr") || q.get("payfail")) h += `<p class="err">결제가 완료되지 않았습니다. ${esc(q.get("payerr") || q.get("message") || "")} 다시 시도하시거나 계좌 입금을 이용해 주세요.</p>`;
+  const rcp = o.pay_receipt ? ` <a href="${esc(o.pay_receipt)}" target="_blank" rel="noopener">카드 영수증 보기</a>` : "";
+  if (st === "canceled") h += `<p class="err">이 신청은 취소되었습니다.${o.pay_method === "toss" && o.paid_at ? " 카드 결제는 취소(환불) 처리되었습니다. 카드사에 따라 3~7영업일 뒤 반영됩니다." : ""} 궁금하신 점은 031-818-6336으로 연락 주세요.</p>`;
+  else if (done) h += `${q.get("paid") ? `<div class="ok">✅ 결제가 완료되었습니다.</div>` : ""}<p><b>보고서가 발행되었습니다.</b> 아래 버튼으로 보시고, 'PDF로 저장'을 누르시면 파일로 보관하실 수 있습니다.${rcp}</p><a class="btn" href="/report?t=${encodeURIComponent(t)}">📄 보고서 보기</a>`;
+  else if (st === "paid") h += `<div class="ok">✅ 결제가 완료되었습니다 (${won(o.amount)}).${rcp}</div><p>보고서를 만들고 있습니다. <b>결제일로부터 1영업일 안에</b> 발행되며, 발행되면 이 화면에서 바로 보실 수 있습니다.</p>`;
+  else {
+    const bankBox = `<div class="pay"><p style="margin:0 0 8px">아래 계좌로 입금해 주시면, 확인하는 대로 보고서가 바로 발행됩니다. (입금 확인 후 1영업일 안, 평일 낮에는 보통 30분 안)</p>
     <div class="row"><span>입금 계좌</span><span>${esc(o.bank || "계좌 안내 준비 중")}${o.bank ? `<button class="copy" data-c="${esc(o.bank.match(/[\d-]{8,}/)?.[0] || o.bank)}">복사</button>` : ""}</span></div>
     <div class="row"><span>입금하실 금액</span><b>${won(o.amount)}</b></div>
     <div class="row"><span>입금자명</span><span><b>${esc(o.depositor)}</b><button class="copy" data-c="${esc(o.depositor)}">복사</button></span></div>
-    <p class="muted" style="font-size:.85rem;margin:8px 0 0">입금자명을 꼭 위와 같이 적어 주세요. 이름 뒤 숫자 4자리로 신청을 찾습니다.</p></div>
-    <p class="muted" style="font-size:.85rem">이 화면은 1분마다 저절로 새로 고쳐집니다. <b>지금 주소를 즐겨찾기</b> 해 두시거나, 나중에 <a href="/order">신청 확인</a>에서 신청번호와 휴대폰 번호로 다시 들어오실 수 있습니다.</p>`;
+    <p class="muted" style="font-size:.85rem;margin:8px 0 0">입금자명을 꼭 위와 같이 적어 주세요. 이름 뒤 숫자 4자리로 신청을 찾습니다.</p></div>`;
+    if (o.toss) h += `<h2 style="font-size:1.05rem;margin:16px 0 0">결제 방법</h2>
+      <div class="pm"><button data-pm="toss" class="on">💳 카드·간편결제</button><button data-pm="bank">🏦 계좌 입금</button></div>
+      <div id="pmToss"><div class="row"><span>결제하실 금액</span><b>${won(o.amount)}</b></div>
+        <div id="payment-method"></div><div id="agreement"></div>
+        <button class="btn" id="payGo" disabled>${won(o.amount)} 결제하기</button>
+        <p class="err" id="payErr"></p>
+        <p class="muted" style="font-size:.85rem">결제가 끝나면 보고서가 바로 발행됩니다(늦어도 1영업일 안). 카드 결제는 카드 매출전표가 증빙이 됩니다.${o.toss.test ? " <b>지금은 테스트 결제 환경이라 실제 돈이 나가지 않습니다.</b>" : ""}</p></div>
+      <div id="pmBank" hidden>${bankBox}</div>`;
+    else h += bankBox;
+    h += `<p class="muted" style="font-size:.85rem">나중에 <a href="/order">신청 확인</a>에서 신청번호와 휴대폰 번호로 다시 들어오실 수 있습니다. 환불 규정은 <a href="/terms">이용약관</a> 제2조의2를 확인해 주세요.</p>`;
+  }
   h += `</div><p class="muted" style="font-size:.82rem">문의: 주식회사 벤투런 · 031-818-6336 · moongoldenj@naver.com</p>`;
   $("#app").innerHTML = h;
   clearTimeout(timer);
-  if (st === "requested") timer = setTimeout(load, 60000);
+  if (st === "requested" && o.toss) initToss(o);
+  else if (st === "requested" || st === "paid") timer = setTimeout(load, 60000);
+}
+// 토스페이먼츠 결제위젯 (v2)
+function loadScript(src) {
+  return new Promise((ok, no) => { if (window.TossPayments) return ok(); const el = document.createElement("script"); el.src = src; el.onload = ok; el.onerror = () => no(new Error("결제창을 불러오지 못했습니다")); document.head.appendChild(el); });
+}
+async function initToss(o) {
+  document.querySelectorAll("[data-pm]").forEach((b) => b.addEventListener("click", () => {
+    document.querySelectorAll("[data-pm]").forEach((x) => x.classList.toggle("on", x === b));
+    const bank = b.dataset.pm === "bank";
+    $("#pmToss").hidden = bank; $("#pmBank").hidden = !bank;
+    clearTimeout(timer); if (bank) timer = setTimeout(load, 60000);
+  }));
+  try {
+    await loadScript("https://js.tosspayments.com/v2/standard");
+    const widgets = TossPayments(o.toss.clientKey).widgets({ customerKey: TossPayments.ANONYMOUS });
+    await widgets.setAmount({ currency: "KRW", value: o.amount });
+    await Promise.all([
+      widgets.renderPaymentMethods({ selector: "#payment-method", variantKey: "DEFAULT" }),
+      widgets.renderAgreement({ selector: "#agreement", variantKey: "AGREEMENT" }),
+    ]);
+    $("#payGo").disabled = false;
+    $("#payGo").onclick = async () => {
+      $("#payErr").textContent = "";
+      try {
+        await widgets.requestPayment({
+          orderId: o.toss.orderId, orderName: o.toss.orderName,
+          successUrl: location.origin + "/api/pay?t=" + encodeURIComponent(t),
+          failUrl: location.origin + "/order?t=" + encodeURIComponent(t) + "&payfail=1",
+        });
+      } catch (e) { $("#payErr").textContent = e.code === "USER_CANCEL" ? "결제를 취소하셨습니다." : (e.message || "결제를 진행하지 못했습니다"); }
+    };
+  } catch (e) {
+    $("#payErr").textContent = (e.message || "결제창을 불러오지 못했습니다") + " · 계좌 입금으로도 신청하실 수 있습니다.";
+  }
 }
 document.addEventListener("click", async (e) => {
   const b = e.target.closest(".copy"); if (!b) return;

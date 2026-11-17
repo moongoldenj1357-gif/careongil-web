@@ -22,7 +22,7 @@ button.warn{color:#b4472f}
 .o.new{border:2px solid var(--warm);background:var(--warm-soft)}
 .o h3{margin:0 0 4px;font-size:1rem}
 .chip{display:inline-block;border-radius:999px;padding:1px 9px;font-size:.78rem;font-weight:700;color:#fff;background:#999;margin-left:6px}
-.chip.requested{background:var(--warm)}.chip.done{background:var(--main)}
+.chip.requested{background:var(--warm)}.chip.paid{background:#b4472f}.chip.done{background:var(--main)}
 .kv{color:var(--sub);font-size:.88rem}
 .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:9px}
@@ -36,7 +36,7 @@ input{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:9
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const won = (n) => Number(n).toLocaleString("ko-KR") + "원";
-const ST = { requested: "입금 대기", done: "발행 완료", canceled: "취소" };
+const ST = { requested: "결제·입금 대기", paid: "결제 완료 · 발행 대기", done: "발행 완료", canceled: "취소" };
 let code = sessionStorage.getItem("cog_admin") || "", rows = [], tab = "requested", seen = null, timer, silver = [];
 const SI = [["monthly","매월 비용"],["rooms","1인실·2인실"],["meals","식사"],["cleaning","청소·세탁"],["health","건강관리"],["care","거동 불편 시"],["entry","입주 조건"],["refund","보증금 반환"]];
 
@@ -58,26 +58,27 @@ function inputs(o) {
 }
 function receipt(o) {
   const r = o.receipt || {};
+  if (r.type === "card") return "카드 매출전표";
   if (r.type === "cash") return `현금영수증 ${esc(r.no)}`;
   if (r.type === "tax") return `세금계산서 ${esc(r.no)}${r.corp ? ` (${esc(r.corp)})` : ""} · ${esc(r.email)}`;
   return "증빙 필요 없음";
 }
 function draw(kakao) {
-  const list = rows.filter((o) => tab === "all" || o.status === tab);
-  const nReq = rows.filter((o) => o.status === "requested").length;
+  const list = rows.filter((o) => tab === "all" || o.status === tab || (tab === "requested" && o.status === "paid"));
+  const nReq = rows.filter((o) => o.status === "requested" || o.status === "paid").length;
   document.title = (nReq ? `(${nReq}) ` : "") + "관리자 | 케어온길 비즈";
   $("#app").innerHTML = `
   <div class="card"><b>카카오톡 알림</b> — ${kakao.connected ? `✅ 연결됨${kakao.refreshUntil ? ` (다시 연결 필요 예상: ${kakao.refreshUntil} 무렵)` : ""} <button id="kt">시험 보내기</button> <button id="kc">다시 연결</button>` : `❌ 연결 안 됨 <button class="pri" id="kc">카카오톡 알림 연결하기</button>`}
     <span class="kv" id="km"></span>
     <br><span class="kv">브라우저 알림: <button id="bn">이 화면에서 알림 받기</button> (관리자 화면을 열어 두면 1분마다 새 신청을 확인합니다)</span></div>
   ${silverCard()}
-  <div class="tabs">${[["requested", `입금 대기 ${nReq}`], ["done", "발행 완료"], ["canceled", "취소"], ["all", "전체"]].map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${l}</button>`).join(" ")} <button id="rf">새로 고침</button></div>
-  ${list.length ? list.map((o) => `<div class="o ${o.status === "requested" ? "new" : ""}">
+  <div class="tabs">${[["requested", `처리 대기 ${nReq}`], ["done", "발행 완료"], ["canceled", "취소"], ["all", "전체"]].map(([k, l]) => `<button data-tab="${k}" class="${tab === k ? "on" : ""}">${l}</button>`).join(" ")} <button id="rf">새로 고침</button></div>
+  ${list.length ? list.map((o) => `<div class="o ${o.status === "requested" || o.status === "paid" ? "new" : ""}">
     <h3>${esc(o.no)} · ${esc(o.product_nm)} <span class="chip ${o.status}">${ST[o.status]}</span></h3>
-    <div>${esc(o.region_nm)} · ${esc(o.kind_nm)} · <b>${won(o.amount)}</b> · 입금자명 <b>${esc(o.name.replace(/\s/g, "").slice(0, 4) + o.no.slice(-4))}</b></div>
+    <div>${esc(o.region_nm)} · ${esc(o.kind_nm)} · <b>${won(o.amount)}</b> · ${o.pay_method === "toss" && o.paid_at ? `💳 카드·간편결제 ${new Date(o.paid_at).toLocaleString("ko-KR")}${o.pay_info?.test ? " (테스트)" : ""}${o.pay_info?.receipt ? ` <a href="${esc(o.pay_info.receipt)}" target="_blank">영수증</a>` : ""}${o.pay_info?.canceledAt ? " · 결제 취소됨" : ""}` : `입금자명 <b>${esc(o.name.replace(/\s/g, "").slice(0, 4) + o.no.slice(-4))}</b>`}</div>
     <div class="kv">${esc(o.name)} · ${esc(o.phone)}${o.email ? ` · ${esc(o.email)}` : ""} · ${receipt(o)} · 신청 ${new Date(o.created_at).toLocaleString("ko-KR")}${o.done_at ? ` · 발행 ${new Date(o.done_at).toLocaleString("ko-KR")}` : ""}</div>
     ${inputs(o)}${o.report_err ? `<div class="err">오류: ${esc(o.report_err)}</div>` : ""}
-    <div class="acts">${o.status === "requested" ? `<button class="pri" data-a="approve" data-no="${o.no}">입금 확인 → 보고서 발행</button>` : ""}
+    <div class="acts">${o.status === "requested" ? `<button class="pri" data-a="approve" data-no="${o.no}">입금 확인 → 보고서 발행</button>` : ""}${o.status === "paid" ? `<button class="pri" data-a="approve" data-no="${o.no}">보고서 발행</button>` : ""}
       ${o.status === "done" ? `<a href="/report?t=${encodeURIComponent(o.token)}" target="_blank"><button>보고서 보기</button></a><button data-a="rebuild" data-no="${o.no}">다시 만들기</button>` : ""}
       <a href="/order?t=${encodeURIComponent(o.token)}" target="_blank"><button>고객 화면</button></a>
       ${o.status !== "canceled" ? `<button class="warn" data-a="cancel" data-no="${o.no}">취소</button>` : ""}</div></div>`).join("") : `<p class="kv">해당하는 신청이 없습니다.</p>`}`;
@@ -97,7 +98,7 @@ async function load() {
   try {
     const j = await call("GET");
     rows = j.rows; silver = j.silver || [];
-    const ids = new Set(rows.filter((o) => o.status === "requested").map((o) => o.no));
+    const ids = new Set(rows.filter((o) => o.status === "requested" || o.status === "paid").map((o) => o.no));
     if (seen) { const fresh = [...ids].filter((x) => !seen.has(x)); if (fresh.length && "Notification" in window && Notification.permission === "granted") new Notification("케어온길 새 리포트 신청", { body: `${fresh.length}건이 들어왔습니다` }); }
     seen = ids;
     draw(j.kakao);
@@ -118,7 +119,7 @@ document.addEventListener("click", async (e) => {
     return load();
   }
   const a = b.dataset.a, no = b.dataset.no; if (!a) return;
-  const ask = { approve: `${no} 입금을 확인하셨나요? 보고서를 바로 발행합니다.`, rebuild: `${no} 보고서를 최신 자료로 다시 만들까요?`, cancel: `${no} 신청을 취소할까요?` }[a];
+  const ask = { approve: `${no} 입금을 확인하셨나요? 보고서를 바로 발행합니다.`, rebuild: `${no} 보고서를 최신 자료로 다시 만들까요?`, cancel: rows.find((x) => x.no === no)?.pay_method === "toss" && rows.find((x) => x.no === no)?.paid_at ? `${no} 신청을 취소하고 카드 결제를 전액 환불(결제 취소)할까요? 되돌릴 수 없습니다.` : `${no} 신청을 취소할까요?` }[a];
   if (!confirm(ask)) return;
   b.disabled = true; b.textContent = a === "cancel" ? "취소 중…" : "보고서 만드는 중… (최대 1분)";
   try { const j = await call("POST", { action: a, no }); if (j.nearErr) alert("발행은 되었지만 반경 분석을 넣지 못했습니다: " + j.nearErr); load(); }
