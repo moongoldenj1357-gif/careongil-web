@@ -82,7 +82,13 @@ async function load() {
     <div class="row"><span>입금하실 금액</span><b>${won(o.amount)}</b></div>
     <div class="row"><span>입금자명</span><span><b>${esc(o.depositor)}</b><button class="copy" data-c="${esc(o.depositor)}">복사</button></span></div>
     <p class="muted" style="font-size:.85rem;margin:8px 0 0">입금자명을 꼭 위와 같이 적어 주세요. 이름 뒤 숫자 4자리로 신청을 찾습니다.</p></div>`;
-    if (o.toss) h += `<h2 style="font-size:1.05rem;margin:16px 0 0">결제 방법</h2>
+    if (o.va) h += `<div class="pay"><p style="margin:0 0 8px"><b>가상계좌가 발급되었습니다.</b> 아래 계좌로 입금하시면 <b>자동으로 확인되어 보고서가 바로 발행</b>됩니다. 이 계좌는 이번 신청 전용입니다.</p>
+      <div class="row"><span>은행</span><b>${esc(o.va.bank || "")}</b></div>
+      <div class="row"><span>계좌번호</span><span><b>${esc(o.va.account || "")}</b><button class="copy" data-c="${esc(o.va.account || "")}">복사</button></span></div>
+      <div class="row"><span>입금하실 금액</span><b>${won(o.amount)}</b></div>
+      <div class="row"><span>입금 기한</span><span>${o.va.due ? new Date(o.va.due).toLocaleString("ko-KR") : "-"}</span></div>
+      <p class="muted" style="font-size:.85rem;margin:8px 0 0">금액이 다르거나 기한이 지나면 입금되지 않습니다. 기한이 지났다면 031-818-6336으로 연락 주세요.</p></div>`;
+    else if (o.toss) h += `<h2 style="font-size:1.05rem;margin:16px 0 0">결제 방법</h2>
       <div class="pm"><button data-pm="toss" class="on">💳 카드·간편결제</button><button data-pm="bank">🏦 계좌 입금</button></div>
       <div id="pmToss"><div class="row"><span>결제하실 금액</span><b>${won(o.amount)}</b></div>
         <div id="payment-method"></div><div id="agreement"></div>
