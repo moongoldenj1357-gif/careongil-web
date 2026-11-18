@@ -24,7 +24,8 @@ function pub(o) {
     depositor: depositor(o), bank: bank(), name: o.name.slice(0, 1) + "*".repeat(Math.max(1, o.name.length - 1)),
     pay_method: o.pay_method || "bank", paid_at: o.paid_at || null, pay_receipt: o.pay_info?.receipt || null,
     // 카드·간편결제(토스 결제위젯)에 필요한 공개 값
-    toss: toss.ready() && o.status === "requested" ? { clientKey: toss.clientKey(), orderId: toss.orderIdOf(o.no), orderName: `케어온길 ${PRODUCTS[o.product]?.nm || "리포트"}`, test: toss.isTest() } : null,
+    va: o.status === "requested" && o.pay_info?.va ? o.pay_info.va : null, // 발급된 가상계좌 (입금 대기)
+    toss: toss.ready() && o.status === "requested" && !o.pay_info?.va ? { clientKey: toss.clientKey(), orderId: toss.orderIdOf(o.no), orderName: `케어온길 ${PRODUCTS[o.product]?.nm || "리포트"}`, test: toss.isTest() } : null,
   };
 }
 const depositor = (o) => `${o.name.replace(/\s/g, "").slice(0, 4)}${o.no.slice(-4)}`;

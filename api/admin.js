@@ -88,7 +88,12 @@ export default async function handler(req, res) {
     if (b.action === "cancel") {
       if (o.status === "canceled") return res.status(400).json({ 오류: "이미 취소된 신청입니다" });
       let pay_info = o.pay_info;
-      if (o.pay_key) { // 카드·간편결제 → 토스에서 결제 취소(전액 환불)
+      if (o.pay_key && o.pay_info?.method === "가상계좌" && o.status !== "requested" && !b.manual) {
+        // 입금된 가상계좌는 환불받을 고객 계좌가 있어야 취소할 수 있음 → 토스 상점관리자에서 직접 처리
+        return res.status(400).json({ 오류: "가상계좌로 입금된 결제는 고객의 환불 계좌가 필요합니다. 토스 상점관리자 > 결제조회에서 환불 계좌를 넣어 취소한 뒤, 여기서 다시 [취소]를 눌러 주세요.", vaRefund: true });
+      }
+      if (b.manual) pay_info = { ...(o.pay_info || {}), canceledAt: new Date().toISOString(), cancelStatus: "토스에서 직접 환불" };
+      else if (o.pay_key) { // 카드·간편결제(또는 입금 전 가상계좌) → 토스에서 결제 취소
         const c = await toss.cancel(o.pay_key, String(b.reason || "고객 요청에 따른 취소"));
         pay_info = { ...(o.pay_info || {}), canceledAt: new Date().toISOString(), cancelStatus: c.status || null };
       }
