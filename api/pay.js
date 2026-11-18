@@ -40,6 +40,8 @@ export default async function handler(req, res) {
     await markPaid(o, p, paymentKey);
     return back(res, t, "&paid=1");
   } catch (e) {
+    // 관리자 화면에서 원인을 볼 수 있게 마지막 결제 오류를 남김 (카드번호 등은 없음)
+    await sb(`report_orders?token=eq.${t}&status=eq.requested`, { method: "PATCH", body: { report_err: `결제 승인 실패 ${new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}: ${String(e.code ? `[${e.code}] ` : "")}${String(e.message || "").slice(0, 200)}` }, prefer: "return=minimal" }).catch(() => {});
     return back(res, t, "&payerr=" + encodeURIComponent(e.message || "결제 승인에 실패했습니다"));
   }
 }
