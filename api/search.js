@@ -3,6 +3,7 @@
 //  /api/search?sido=41&sgg=110&kind=home&q=이름&sort=name&page=1 → 목록 (한 쪽 20곳)
 //      kind는 쉼표로 여러 개 가능(home,daycare). sido 없이 쓰려면 q(이름 2글자 이상) 필요.
 //      sort: name(이름순) | capacity(정원 큰 순) | new(최근 지정) | old(오래된 곳) | grade(평가 등급 순)
+//  /api/search?sido=41&sgg=285&kind=home&all=1                → 한 시·군·구 전체(최대 1000곳, 쪽 나눔 없음) — "가까운 순"은 브라우저에서 거리 계산
 //  /api/search?id=기관기호:유형코드                           → 1곳 상세
 //  /api/search?ids=기호:유형,기호:유형 (최대 5곳)              → 비교
 //  /api/search?mode=stats&sido=41&sgg=110&kind=daycare          → 창업 참고용 지역 요약 (시도 전체 + 시군구별)
@@ -15,7 +16,7 @@ const H = (x = {}) => ({ apikey: SB_KEY, ...(SB_KEY.startsWith("sb_") ? {} : { A
 
 const KIND_NM = { home: "요양원", daycare: "주야간보호", short: "단기보호", visit_care: "방문요양", visit_bath: "방문목욕", visit_nurse: "방문간호", tool: "복지용구", other: "기타", unit: "치매전담실" };
 const SORTS = { name: "name.asc", capacity: "capacity.desc.nullslast,name.asc", new: "designated.desc.nullslast,name.asc", old: "designated.asc.nullslast,name.asc", grade: "eval_grade.asc.nullslast,name.asc" };
-const LIST_COLS = "sym,pttn,name,kind,sido_cd,sgg_cd,addr,tel,capacity,now_m,now_f,wait_m,wait_f,designated,homepage,detail_at,eval_grade,eval_year";
+const LIST_COLS = "sym,pttn,name,kind,sido_cd,sgg_cd,addr,tel,capacity,now_m,now_f,wait_m,wait_f,designated,homepage,detail_at,eval_grade,eval_year,lat,lng";
 const DETAIL_COLS = `${LIST_COLS},addr_detail,post,parking,transport,list_seen,staff,rooms,nonpay,programs,extra_at`;
 const PAGE = 20;
 // 실버타운·양로원 (silver_facilities 표). 시·도 코드는 lib/ltc.js SIDOS와 같음 (12 = 전남광주통합특별시)
@@ -246,18 +247,20 @@ export default async function handler(req, res) {
     const name = String(q.q || "").replace(/[*,()%\\.:"'`;=&]/g, " ").trim().slice(0, 30);
     if (!sido && name.length < 2) return res.status(400).json({ 오류: "시·도를 고르시거나 기관 이름을 2글자 이상 넣어 주시면 됩니다" });
     const kinds = String(q.kind || "").split(",").map((k) => k.trim()).filter((k) => k in KIND_NM);
-    const page = Math.min(Math.max(parseInt(q.page, 10) || 1, 1), 500);
+    // all=1: 시·군·구 하나 전체를 한 번에 (가까운 순 정렬은 이용자 위치를 서버로 보내지 않고 브라우저에서 계산)
+    const all = q.all === "1" && sido && sgg;
+    const page = all ? 1 : Math.min(Math.max(parseInt(q.page, 10) || 1, 1), 500);
     const f = [`select=${LIST_COLS}`];
     if (sido) f.push(`sido_cd=eq.${sido}`);
     if (sido && sgg) f.push(`sgg_cd=eq.${sgg}`);
     if (kinds.length === 1) f.push(`kind=eq.${kinds[0]}`);
     else if (kinds.length > 1) f.push(`kind=in.(${kinds.join(",")})`);
     if (name) f.push(`name=ilike.${encodeURIComponent(`*${name.replace(/\s+/g, "*")}*`)}`);
-    f.push(`order=${SORTS[q.sort] || SORTS.name}`, `limit=${PAGE}`, `offset=${(page - 1) * PAGE}`);
+    f.push(`order=${SORTS[q.sort] || SORTS.name}`, `limit=${all ? 1000 : PAGE}`, `offset=${(page - 1) * PAGE}`);
     const { data, range } = await sb(`ltc_insts?${f.join("&")}`, { Prefer: "count=exact" });
     const total = Number(String(range || "").split("/")[1]) || data.length;
     res.setHeader("Cache-Control", "public, s-maxage=300, stale-while-revalidate=1800");
-    return res.status(200).json({ total, page, pages: Math.max(1, Math.ceil(total / PAGE)), rows: await addUnits(data.map(shape)) });
+    return res.status(200).json({ total, page, pages: all ? 1 : Math.max(1, Math.ceil(total / PAGE)), rows: await addUnits(data.map(shape)) });
   } catch (e) {
     return res.status(500).json({ 오류: e.message });
   }
