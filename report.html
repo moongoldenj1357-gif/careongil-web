@@ -22,7 +22,7 @@ h2{font-size:1.2rem;margin:34px 0 10px;padding-top:14px;border-top:2px solid var
 h3{font-size:1rem;margin:20px 0 6px}
 .meta{color:var(--sub);font-size:.9rem}
 .lead{background:var(--main-soft);border-radius:12px;padding:14px 16px;margin:16px 0}
-.lead li{margin:4px 0}
+.lead li{margin:6px 0}.doc ul{padding-left:20px}.doc li{margin:4px 0}
 .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:10px 0}
 @media (max-width:640px){.kpis{grid-template-columns:repeat(2,1fr)}.doc{padding:20px 14px}}
 .kpi{background:#f6f3ec;border-radius:10px;padding:10px 12px}
@@ -102,69 +102,197 @@ function plTable(pl) {
 }
 function hist(h) { return h && h.length ? esc(h.join("→")) : "–"; }
 
+// ---------- 해설 문장 도우미 ----------
+const pp = (d) => `${d >= 0 ? "" : "−"}${Math.abs(Math.round(d * 10) / 10)}%p`;
+const r1 = (x) => Math.round(x * 10) / 10;
+function cmpWord(v, base, tol = 0.1) { if (v == null || base == null) return ""; const r = v / base; return r >= 1 + tol ? "높습니다" : r <= 1 - tol ? "낮습니다" : "비슷합니다"; }
+function category(S, D) {
+  if (S.occ == null || D.occ == null) return "mid-mid";
+  const d = S.occ - D.occ, r = S.capPer1k80 && D.capPer1k80 ? S.capPer1k80 / D.capPer1k80 : 1;
+  const cap = r <= 0.85 ? "low" : r >= 1.15 ? "high" : "mid";
+  const use = d >= 3 || (d > -3 && S.wait > 0 && S.occ >= D.occ) ? "high" : d <= -3 ? "low" : "mid";
+  return `${cap}-${use}`;
+}
+function li(a) { return `<ul>${a.filter(Boolean).map((x) => `<li>${x}</li>`).join("")}</ul>`; }
+
 function render(R) {
-  const S = R.sgg, D = R.sido, place = `${R.region.sido_nm} ${R.region.sgg_nm}`, stay = true, full = R.product !== "basic";
-  document.title = `${R.product_nm} — ${place} · ${R.kind_nm} | 케어온길`;
+  const S = R.sgg, D = R.sido, F = R.facts || {}, place = `${R.region.sido_nm} ${R.region.sgg_nm}`, sg = R.region.sgg_nm, full = R.product !== "basic";
+  const who = R.kind === "home" ? "입소자" : "이용자", KN = R.kind_nm;
+  const cat = category(S, D), [capL, useL] = cat.split("-");
+  const ratio = S.capPer1k80 && D.capPer1k80 ? r1(S.capPer1k80 / D.capPer1k80) : null;
+  const gA = R.byGrade.find((g) => g.label === "A등급"), gNone = R.byGrade.find((g) => g.label.startsWith("평가 없음"));
+  const sizes = R.bySize.filter((x) => x.label !== "10인 미만" && x.occ != null);
+  const big = sizes[sizes.length - 1], small = sizes[0];
+  const sizeGap = big && small && big !== small ? big.occ - small.occ : 0;
+  const pl50 = R.plStd.rows[1], be = pl50.be, newO = R.newOcc?.n ? R.newOcc.occ : null;
+  const at = (pl, o) => pl.rows.find((x) => x.occ === o) || pl.rows[0];
+  let secN = 0; const H2 = (t) => `<h2>${++secN}. ${t}</h2>`;
+  document.title = `${R.product_nm} — ${place} · ${KN} | 케어온길`;
+
+  // ===== 머리말 + 한 줄 결론 =====
+  const one = {
+    "high-high": ratio >= 1.5 ? `${sg} ${KN} 시장은 자리가 이미 많지만 다른 지역 수요까지 끌어오는 곳입니다.` : `${sg} ${KN} 시장은 고령 인구에 비해 자리가 많은 편이지만 잘 채워지는 곳입니다.`,
+    "high-mid": `${sg} ${KN} 시장은 고령 인구에 비해 자리가 많은 편이고, 이용률은 시·도 평균 수준입니다.`,
+    "high-low": `${sg} ${KN} 시장은 자리가 많고 남는 자리도 많아 경쟁이 치열한 곳입니다.`,
+    "mid-high": `${sg} ${KN} 시장은 자리 수는 시·도 평균 수준이고, 잘 채워지는 곳입니다.`,
+    "mid-mid": `${sg} ${KN} 시장은 자리 수와 이용률 모두 시·도 평균 수준입니다.`,
+    "mid-low": `${sg} ${KN} 시장은 자리 수는 평균 수준이지만 남는 자리가 많은 편입니다.`,
+    "low-high": `${sg} ${KN} 시장은 고령 인구에 비해 자리가 적고 잘 채워져, 새 기관이 들어설 여지가 있는 곳으로 보입니다.`,
+    "low-mid": `${sg} ${KN} 시장은 고령 인구에 비해 자리가 적은 편이고, 이용률은 평균 수준입니다.`,
+    "low-low": `${sg} ${KN} 시장은 자리도 적고 이용률도 낮아, 이용 수요 자체가 적거나 이웃 지역으로 빠져나가는 곳으로 보입니다.`,
+  }[cat];
+  const slow = newO != null && S.occ != null && S.occ - newO >= 5;
+  const wq = gA?.wait && S.wait && gA.wait / S.wait >= 0.4 ? "대기는 평가가 좋은 기관에 몰려 있습니다" : F.waitTop && S.wait >= 10 && F.waitTop.w2 / S.wait >= 0.5 ? "대기는 몇몇 기관에 몰려 있습니다" : null;
+  const tail = slow && wq ? [`새로 들어가는 기관은 채우는 데 시간이 걸리고, ${wq}`] : slow ? ["새로 들어가는 기관은 채우는 데 시간이 걸립니다"] : wq ? [wq] : [];
   let h = `<p class="meta">케어온길 지역 리포트 · ${esc(R.product_nm)}<span class="tag">신청번호 ${esc(R.no)}</span></p>
-    <h1>${esc(place)} · ${esc(R.kind_nm)}</h1>
-    <p class="meta">발행 ${new Date(R.made_at).toLocaleDateString("ko-KR")} · 기관 자료 국민건강보험공단 공개 정보 · 인구 행정안전부 주민등록인구(${esc(R.popYm || "")})</p>`;
+    <h1>${esc(place)} · ${esc(KN)}</h1>
+    <p class="meta">발행 ${new Date(R.made_at).toLocaleDateString("ko-KR")} · 기관 자료 국민건강보험공단 공개 정보 · 인구 행정안전부 주민등록인구(${esc(R.popYm || "")})</p>
+    <p style="font-size:1.05rem;margin:14px 0 0"><b>${esc(one)}</b>${tail.length ? ` ${esc(tail[0])}.` : ""}</p>`;
 
-  // 한눈에 보기
-  const lead = [];
-  if (R.signal) lead.push(...R.signal);
-  if (S.wait) lead.push(`대기 인원은 ${n(S.wait)}명입니다. ${R.byGrade.find((g) => g.label === "A등급")?.wait ? `그중 A등급 기관에 ${n(R.byGrade.find((g) => g.label === "A등급").wait)}명이 몰려 있습니다.` : ""}`);
-  else lead.push("신고된 대기 인원은 없습니다.");
-  if (R.newOcc && R.newOcc.n) lead.push(`최근 3년 안에 지정되어 아직 평가를 받지 않은 기관 ${n(R.newOcc.n)}곳의 이용률은 ${p(R.newOcc.occ)}입니다. 새 기관이 자리를 채우는 속도를 가늠하는 숫자입니다.`);
-  if (R.outlook?.sgg) { const a = R.outlook.sgg.a80, b = R.outlook.sido?.a80; lead.push(`5년 뒤 80세 이상 인구는 약 ${a.pct > 0 ? "+" : ""}${a.pct}% 바뀔 것으로 보입니다${b ? ` (시·도 ${b.pct > 0 ? "+" : ""}${b.pct}%)` : ""}.`); }
-  if (R.custom) lead.push(`의뢰 조건의 손익분기 이용률은 <b>${R.custom.pl.be}%</b>입니다. 이 지역 평균 이용률(${p(S.occ)})${R.newOcc?.occ != null ? `, 신규 기관 평균(${p(R.newOcc.occ)})` : ""}과 비교해 보세요.`);
-  h += `<div class="lead"><b>한눈에 보기</b><ul style="margin:6px 0 0;padding-left:20px">${lead.map((x) => `<li>${x}</li>`).join("")}</ul></div>`;
+  // ===== 핵심 요약 =====
+  const key = [];
+  if (S.capPer1k80 != null && D.capPer1k80) {
+    const lab = capL === "high" ? "공급이 많습니다." : capL === "low" ? "공급이 적습니다." : "공급은 평균 수준입니다.";
+    key.push(`<b>${lab}</b> 80세 이상 1,000명당 정원이 ${S.capPer1k80}명으로 ${esc(R.region.sido_nm)} 평균(${D.capPer1k80}명)${capL === "mid" ? "과 비슷하며" : `의 ${ratio}배이며`}${F.densRank?.rank ? `, ${esc(R.region.sido_nm)} ${F.densRank.of}개 시·군·구 중 ${F.densRank.rank}번째로 높습니다` : ""}.`);
+  }
+  if (S.occ != null) {
+    const lab = useL === "high" ? (capL === "high" ? "그래도 채워집니다." : "잘 채워집니다.") : useL === "low" ? "남는 자리가 많습니다." : "이용률은 평균 수준입니다.";
+    key.push(`<b>${lab}</b> 이용률 ${S.occ}%(${esc(R.region.sido_nm)} ${D.occ}%), 대기 ${n(S.wait)}명입니다.${cat === "high-high" && ratio >= 1.5 ? " 이 지역 어르신만으로는 채울 수 없는 규모라, 인근 지역의 수요가 들어오는 것으로 보입니다." : ""}`);
+  }
+  const conc = [];
+  if (sizeGap >= 5) conc.push(`${big.label} 이용률 ${big.occ}%, ${small.label} ${small.occ}%`);
+  if (gA?.wait && S.wait) conc.push(`A등급 기관 ${gA.n}곳이 대기 ${n(S.wait)}명 중 ${n(gA.wait)}명을 차지합니다`);
+  if (conc.length) key.push(`<b>${sizeGap >= 5 && gA?.wait / S.wait >= 0.4 ? "큰 기관·좋은 평가에 수요가 몰립니다." : sizeGap >= 5 ? "큰 기관일수록 잘 채워집니다." : "대기는 평가가 좋은 기관에 몰립니다."}</b> ${conc.join(". ")}.`);
+  if (F.entry && newO != null) key.push(`<b>${F.entry.avg >= 3 ? "진입은 꾸준하고" : "새 진입은 많지 않고"} ${S.occ - newO >= 5 ? "초기가 어렵습니다." : "신규 기관도 비교적 잘 채워집니다."}</b> ${F.entry.from}년 이후 해마다 ${F.entry.min === F.entry.max ? F.entry.min : `${F.entry.min}~${F.entry.max}`}곳이 새로 지정됐고, 아직 평가를 받지 않은 신규 기관 ${n(R.newOcc.n)}곳의 이용률은 ${newO}%입니다.`);
+  if (R.custom) key.push(`<b>의뢰 조건의 손익분기 이용률은 ${R.custom.pl.be}%입니다.</b> 이 지역 평균 이용률(${p(S.occ)})${newO != null ? `, 신규 기관 평균(${newO}%)` : ""}과 비교해 보세요.`);
+  h += `<div class="lead"><b>핵심 요약</b>${li(key)}</div>`;
 
-  // 1. 수요
-  h += `<h2>1. 고령 인구 (수요)</h2>`;
-  if (S.pop) h += `<div class="kpis">${kpi("65세 이상", n(S.pop.p65) + "명", `고령화율 ${S.pop.aged}% · 시·도 ${D.pop?.aged ?? "–"}%`)}${kpi("75세 이상", n(S.pop.p75) + "명")}${kpi("80세 이상", n(S.pop.p80) + "명", `85세 이상 ${n(S.pop.p85)}명`)}</div>`;
+  // ===== 1. 수요 =====
+  h += H2("수요: 고령 인구");
+  const peers = (F.peers || []).map((cd) => R.sggs.find((x) => x.cd === cd)).filter(Boolean);
+  if (S.pop) {
+    const pTxt = peers.length ? ` 아래 표에 비교 지역(${peers.slice(0, 3).map((x) => esc(x.nm)).join(", ")})을 함께 실었습니다.` : "";
+    const aw = cmpWord(S.pop.aged, D.pop?.aged, 0.05);
+    h += `<p>${esc(sg)}의 80세 이상 인구는 <b>${n(S.pop.p80)}명</b>, 65세 이상은 ${n(S.pop.p65)}명입니다. 고령화율은 ${S.pop.aged}%로 ${esc(R.region.sido_nm)} 평균(${D.pop?.aged ?? "–"}%)${aw === "비슷합니다" ? "과 비슷합니다" : "보다 " + aw}.${pTxt}</p>`;
+    const me = R.sggs.find((x) => x.me);
+    const prow = (x, nm, cls = "") => `<tr class="${cls}"><td class="l">${esc(nm)}</td><td>${n(x.total)}명</td><td>${n(x.p65)}명</td><td>${x.aged ?? "–"}%</td><td>${n(x.p80)}명</td><td>${n(x.p85)}명</td></tr>`;
+    h += table(["지역", "전체 인구", "65세 이상", "고령화율", "80세 이상", "85세 이상"], [
+      prow({ total: S.pop.total, p65: S.pop.p65, aged: S.pop.aged, p80: S.pop.p80, p85: S.pop.p85 }, sg, "me"),
+      ...peers.map((x) => prow(x, x.nm)),
+      D.pop ? prow({ total: D.pop.total, p65: D.pop.p65, aged: D.pop.aged, p80: D.pop.p80, p85: D.pop.p85 }, `${R.region.sido_nm} 전체`) : ""]);
+    h += `<p>${R.kind === "home" ? "요양원 수요는 80세 이후에 크게 늘어납니다. 요양원은 자녀가 사는 곳 가까이로 고르는 경우가 많아, 이웃 지역과 대도시에서 오는 수요도 생각해야 합니다." : R.kind === "daycare" ? "주야간보호는 댁에서 지내시면서 낮 동안 다니시는 서비스라, 송영(차량) 거리 안의 75세 이상 어르신이 주된 수요입니다. 요양원보다 생활권이 좁습니다." : "단기보호는 가족이 잠시 돌보기 어려울 때 이용하는 서비스라, 주변 재가 이용자와 요양원 대기 수요가 함께 영향을 줍니다."}${full ? "" : " 상세 리포트에는 5년 뒤 고령 인구 전망을 함께 넣습니다."}</p>`;
+  }
   if (R.outlook?.sgg) {
     const o = R.outlook.sgg, d = R.outlook.sido;
     h += `<h3>5년 뒤 고령 인구 전망</h3>` + table(["구분", "지금", "5년 뒤(추정)", "증가율", "시·도 증가율"], [["75세 이상", "a75"], ["80세 이상", "a80"], ["85세 이상", "a85"]].map(([l, k]) => `<tr><td>${l}</td><td>${n(o[k].now)}명</td><td>${n(o[k].fut)}명</td><td>${o[k].pct > 0 ? "+" : ""}${o[k].pct}%</td><td>${d ? (d[k].pct > 0 ? "+" : "") + d[k].pct + "%" : "–"}</td></tr>`));
-    if (R.outlook.cap && o.a80.now) { const now = (R.outlook.cap / o.a80.now * 1000).toFixed(1), fut = (R.outlook.cap / o.a80.fut * 1000).toFixed(1); h += `<p>새 정원이 하나도 늘지 않는다고 하면, 80세 이상 1,000명당 정원은 <b>${now}석에서 약 ${fut}석</b>으로 바뀝니다.</p>`; }
+    if (R.outlook.cap && o.a80.now) { const now = (R.outlook.cap / o.a80.now * 1000).toFixed(1), fut = (R.outlook.cap / o.a80.fut * 1000).toFixed(1); h += `<p>새 정원이 하나도 늘지 않는다고 하면, 80세 이상 1,000명당 정원은 <b>${now}석에서 약 ${fut}석</b>으로 바뀝니다. ${+fut < +now ? "고령 인구가 늘어 자리 경쟁이 조금씩 줄어드는 방향입니다." : "고령 인구가 줄어 자리 경쟁이 커지는 방향입니다."}</p>`; }
     h += `<p class="muted small">지금 사는 분들의 나이를 5년 뒤로 옮기고 나이대별 5년 생존율(통계청 생명표 수준)을 곱한 추정입니다. 전입·전출은 넣지 않았습니다.</p>`;
   }
 
-  // 2. 공급
-  h += `<h2>2. 기관 현황 (공급)</h2><div class="kpis">${kpi("기관 수", n(S.n) + "곳", `시·도 ${n(D.n)}곳`)}${kpi("총 정원", n(S.capacity) + "명")}${kpi("이용률", p(S.occ), `시·도 평균 ${p(D.occ)}`)}${kpi("남는 자리(추정)", n(S.vacancy) + "석")}${kpi("대기 인원", n(S.wait) + "명")}${kpi("80세 이상 1,000명당 정원", (S.capPer1k80 ?? "–") + "석", `시·도 평균 ${D.capPer1k80 ?? "–"}석`)}</div>`;
-  h += `<h3>${esc(R.region.sido_nm)} 시·군·구 비교 (이용률 높은 순)</h3>` + table(["시·군·구", "기관", "정원", "이용률", "대기", "신규(3년)", "80세+ 인구", "80세+ 천명당 정원"], R.sggs.map((x) => `<tr class="${x.me ? "me" : ""}"><td>${esc(x.nm)}</td><td>${n(x.n)}</td><td>${n(x.capacity)}</td><td>${p(x.occ)}</td><td>${n(x.wait)}</td><td>${n(x.new3y)}</td><td>${n(x.p80)}</td><td>${x.capPer1k80 ?? "–"}</td></tr>`));
-  h += `<h3>규모별</h3>` + table(["정원 규모", "기관", "정원", "이용률", "대기"], R.bySize.map((x) => `<tr><td>${x.label}</td><td>${n(x.n)}곳</td><td>${n(x.cap)}</td><td>${p(x.occ)}</td><td>${n(x.wait)}</td></tr>`));
-  h += `<h3>평가 등급별 (공단 최근 평가)</h3>` + table(["등급", "기관", "정원", "이용률", "대기"], R.byGrade.map((x) => `<tr><td>${x.label}</td><td>${n(x.n)}곳</td><td>${n(x.cap)}</td><td>${p(x.occ)}</td><td>${n(x.wait)}</td></tr>`));
-  const mx = Math.max(1, ...R.newByYear.map((x) => x.n));
-  h += `<h3>해마다 새로 지정된 기관 (지금 운영 중인 곳 기준)</h3><div class="chart">${R.newByYear.map((x, i) => `<div class="yb"><span>${x.y}</span><i class="${i === R.newByYear.length - 1 ? "ac" : ""}" style="width:${x.n / mx * 100}%"></i><span>${x.n}곳</span></div>`).join("")}</div>`;
+  // ===== 2. 공급 =====
+  h += H2("공급: 정원과 이용률");
+  const perSeat = S.capPer1k80 ? Math.round(1000 / S.capPer1k80) : null;
+  h += `<div class="kpis">${kpi("기관 수", n(S.n) + "곳", `시·도 ${n(D.n)}곳`)}${kpi("총 정원", n(S.capacity) + "명")}${kpi("이용률", p(S.occ), `시·도 평균 ${p(D.occ)}`)}${kpi("남는 자리(추정)", n(S.vacancy) + "석")}${kpi("대기 인원", n(S.wait) + "명")}${kpi("80세 이상 1,000명당 정원", (S.capPer1k80 ?? "–") + "석", `시·도 평균 ${D.capPer1k80 ?? "–"}석`)}</div>`;
+  h += `<p>${esc(sg)}에는 ${esc(KN)} <b>${n(S.n)}곳, 정원 ${n(S.capacity)}명</b>이 있습니다.${S.capPer1k80 != null ? ` 80세 이상 1,000명당 정원이 ${S.capPer1k80}명${perSeat ? `(어르신 약 ${perSeat}명당 1자리)` : ""}으로 ${esc(R.region.sido_nm)} ${F.densRank?.of || "–"}개 시·군·구 중 ${F.densRank?.rank || "–"}번째로 높고, 정원 규모는 ${F.capRank?.rank || "–"}번째입니다.` : ""} 이용률은 ${S.occ != null && D.occ != null ? `${esc(R.region.sido_nm)} 평균보다 ${Math.abs(S.occ - D.occ) < 1 ? "거의 같은 수준" : `${pp(S.occ - D.occ)} ${S.occ > D.occ ? "높습니다" : "낮습니다"}`}` : "–"}${S.occ != null && Math.abs(S.occ - D.occ) < 1 ? "입니다" : ""}.</p>`;
+  const rows2 = [R.sggs.find((x) => x.me), ...peers].filter(Boolean);
+  h += table(["지역", "기관", "정원", "이용률", "대기", "80세 이상 1,000명당 정원"], [...rows2.map((x) => `<tr class="${x.me ? "me" : ""}"><td class="l">${esc(x.nm)}</td><td>${n(x.n)}곳</td><td>${n(x.capacity)}명</td><td>${p(x.occ)}</td><td>${n(x.wait)}명</td><td>${x.capPer1k80 ?? "–"}명</td></tr>`),
+    `<tr><td class="l">${esc(R.region.sido_nm)} 전체</td><td>${n(D.n)}곳</td><td>${n(D.capacity)}명</td><td>${p(D.occ)}</td><td>${n(D.wait)}명</td><td>${D.capPer1k80 ?? "–"}명</td></tr>`]);
+  const lowPeer = peers.filter((x) => x.capPer1k80 != null && D.capPer1k80 && x.capPer1k80 < D.capPer1k80 * 0.6).sort((a, b) => a.capPer1k80 - b.capPer1k80)[0];
+  const read = {
+    high: useL !== "low" ? (ratio >= 1.5 ? `자리가 시·도 평균의 ${ratio}배인데도 ${useL === "high" ? "채워지는" : "평균 수준으로 채워지는"} 것은, 이 지역 어르신만으로는 다 채울 수 없는 자리를 다른 지역 수요가 채우고 있다는 뜻입니다.` : `자리가 시·도 평균보다 조금 많은데도 ${useL === "high" ? "잘 채워지는" : "평균 수준으로 채워지는"} 것은, 이 지역 수요가 탄탄하거나 이웃 지역 수요도 일부 들어오고 있다는 뜻으로 볼 수 있습니다.`) : `고령 인구에 비해 자리가 많고 남는 자리도 많아, 새 기관은 기존 기관에서 ${who}를 데려와야 하는 경쟁 시장입니다.`,
+    low: useL !== "low" ? `고령 인구에 비해 자리가 적은데 잘 채워져, 수요에 비해 공급이 부족한 편으로 보입니다. 다만 이웃 지역 기관을 이용하는 분들도 있어 숫자만큼 빈 수요가 있는 것은 아닐 수 있습니다.` : `고령 인구에 비해 자리가 적은데도 채워지지 않아, 어르신들이 이웃의 큰 지역 기관을 이용하시거나 이용 자체가 적은 곳일 수 있습니다.`,
+    mid: `자리 수는 고령 인구에 비해 시·도 평균 수준입니다. ${useL === "high" ? "이용률이 높고 대기도 있어 수요가 탄탄한 편입니다." : useL === "low" ? "이용률이 평균보다 낮아 남는 자리를 두고 경쟁하는 편입니다." : "이용률도 평균 수준이라, 기관의 규모·평가·위치에 따라 결과가 갈립니다."}`,
+  }[capL];
+  h += `<p class="note"><b>읽는 법:</b> ${read}${lowPeer ? ` 비교 지역인 ${esc(lowPeer.nm)}는 1,000명당 정원이 ${lowPeer.capPer1k80}명으로 매우 적어서, 그 지역 어르신의 일부가 ${esc(sg)} 기관을 이용할 가능성이 있습니다.` : ""} 다만 공단 자료에는 ${who}의 주소가 없어서, 어디에서 오는지는 확인할 수 없습니다.</p>`;
+  if (full) h += `<h3>${esc(R.region.sido_nm)} 시·군·구 전체 비교 (이용률 높은 순)</h3>` + table(["시·군·구", "기관", "정원", "이용률", "대기", "신규(3년)", "80세+ 인구", "80세+ 천명당 정원"], R.sggs.map((x) => `<tr class="${x.me ? "me" : ""}"><td>${esc(x.nm)}</td><td>${n(x.n)}</td><td>${n(x.capacity)}</td><td>${p(x.occ)}</td><td>${n(x.wait)}</td><td>${n(x.new3y)}</td><td>${n(x.p80)}</td><td>${x.capPer1k80 ?? "–"}</td></tr>`));
 
-  // 3. 경쟁 기관
+  // ===== 3. 경쟁 구조 =====
+  h += H2("경쟁 구조");
+  const c3 = [];
+  if (sizeGap >= 5) c3.push("규모가 클수록 이용률이 높습니다");
+  else if (sizeGap <= -5) c3.push("오히려 작은 기관의 이용률이 더 높습니다");
+  if (F.waitTop && S.wait) c3.push(`대기 ${n(S.wait)}명 중 ${n(F.waitTop.w1)}명이 한 기관(정원 ${n(F.waitTop.cap1)}명)에 있고${F.waitTop.n > 1 ? `, 상위 2곳이 ${n(F.waitTop.w2)}명을 차지합니다` : ""}`);
+  else c3.push("신고된 대기 인원이 없습니다");
+  h += `<p>${c3.join(". ")}.</p>`;
+  h += `<h3>규모별</h3>` + table(["정원 규모", "기관", "정원 합계", "이용률", "대기", "대기 있는 기관"], R.bySize.map((x) => `<tr><td>${x.label}</td><td>${n(x.n)}곳</td><td>${n(x.cap)}명</td><td>${p(x.occ)}</td><td>${n(x.wait)}명</td><td>${x.waitN != null ? n(x.waitN) + "곳" : "–"}</td></tr>`));
+  h += `<h3>기관평가 등급별 (공단 최근 평가)</h3>` + table(["등급", "기관", "이용률", "대기"], R.byGrade.map((x) => `<tr><td>${x.label}</td><td>${n(x.n)}곳</td><td>${p(x.occ)}</td><td>${n(x.wait)}명</td></tr>`));
+  const g3 = [];
+  const graded = R.byGrade.filter((x) => /^[A-E]/.test(x.label) && x.occ != null);
+  const gMin = graded.length ? Math.min(...graded.map((x) => x.occ)) : null;
+  if (gNone?.occ != null && gMin != null && gMin - gNone.occ >= 5) g3.push(`평가 등급보다 운영 기간이 이용률을 더 크게 가릅니다. 평가를 받은 기관은 등급과 관계없이 ${gMin}% 이상이지만, 아직 평가를 받지 않은 신규 기관은 ${gNone.occ}%입니다.`);
+  else if (gA?.occ != null && gNone?.occ != null) g3.push(`A등급 기관의 이용률은 ${gA.occ}%, 평가를 아직 받지 않은 기관은 ${gNone.occ}%입니다.`);
+  if (gA?.wait && S.wait) g3.push(gA.wait / S.wait >= 0.4 ? `대기는 A등급에 몰려(${n(S.wait)}명 중 ${n(gA.wait)}명), 보호자가 평가를 보고 기다리는 것으로 보입니다.` : `A등급 기관의 대기는 ${n(gA.wait)}명으로 전체 대기의 ${Math.round(gA.wait / S.wait * 100)}%입니다.`);
+  if (F.gradeChange?.n >= 5) g3.push(`평가 이력이 두 번 이상 있는 ${n(F.gradeChange.n)}곳 중 ${n(F.gradeChange.changed)}곳(${Math.round(F.gradeChange.changed / F.gradeChange.n * 100)}%)은 평가마다 등급이 바뀌었습니다. 등급은 고정된 것이 아니라 운영에 따라 오르내립니다.`);
+  if (g3.length) h += `<p>${g3.join(" ")}</p>`;
   if (full) {
-    h += `<h2>3. 기관 전체 목록 (${n(R.list.length)}곳, 정원 큰 순)</h2>` + table(["#", "기관", "지정", "정원", "현원", "이용률", "대기", "요양보호사", "평가 이력(→최근)"], R.list.map((r, i) => `<tr><td>${i + 1}</td><td class="l">${esc(r.name)}</td><td>${r.y ?? "–"}</td><td>${n(r.cap)}</td><td>${n(r.now)}</td><td>${p(r.occ)}</td><td>${n(r.wait)}</td><td>${n(r.cw)}</td><td>${hist(r.hist)}</td></tr>`));
+    h += `<h3>기관 전체 목록 (${n(R.list.length)}곳, 정원 큰 순)</h3>` + table(["#", "기관", "지정", "정원", "현원", "이용률", "대기", "요양보호사", "평가 이력(→최근)"], R.list.map((r, i) => `<tr><td>${i + 1}</td><td class="l">${esc(r.name)}</td><td>${r.y ?? "–"}</td><td>${n(r.cap)}</td><td>${n(r.now)}</td><td>${p(r.occ)}</td><td>${n(r.wait)}</td><td>${n(r.cw)}</td><td>${hist(r.hist)}</td></tr>`));
   } else {
-    h += `<h2>3. 정원 상위 10곳</h2>` + table(["기관", "지정", "정원", "현원", "이용률", "대기", "평가"], R.top.map((r) => `<tr><td class="l">${esc(r.name)}</td><td>${r.y ?? "–"}</td><td>${n(r.cap)}</td><td>${n(r.now)}</td><td>${p(r.occ)}</td><td>${n(r.wait)}</td><td>${r.grade || "–"}</td></tr>`));
+    h += `<h3>정원 상위 10곳 (공단 신고 기준)</h3>` + table(["기관", "지정", "정원", "현원", "이용률", "대기", "평가"], R.top.map((r) => `<tr><td class="l">${esc(r.name)}</td><td>${r.y ?? "–"}</td><td>${n(r.cap)}</td><td>${n(r.now)}</td><td>${p(r.occ)}</td><td>${n(r.wait)}</td><td>${r.grade || "–"}</td></tr>`));
   }
-  h += `<p class="muted small">정원·현원·대기는 기관이 공단에 신고한 값이라 실제와 다를 수 있습니다.</p>`;
+  const t3 = [];
+  if (F.bigNew) t3.push(`최근 3년 안에 문을 연 정원 ${F.bigNew.cut}인 이상 기관 ${n(F.bigNew.n)}곳은 이미 ${F.bigNew.lo === F.bigNew.hi ? F.bigNew.lo : `${F.bigNew.lo}~${F.bigNew.hi}`}%를 채웠습니다.${F.bigNew.lo >= 80 ? " 새 시설이라도 규모가 크면 빨리 차는 편입니다." : ""}`);
+  if (!full) t3.push(`상세 리포트에는 ${n(S.n)}곳 전체 목록과 기관별 평가 이력·인력을 넣습니다.`);
+  t3.push(`정원·현원·대기는 기관이 공단에 신고한 값이라 실제와 다를 수 있습니다.`);
+  h += `<p class="muted small">${t3.join(" ")}</p>`;
 
-  // 4. 운영 비교
-  h += `<h2>4. 운영 비교 (중간값)</h2><div class="kpis">${kpi("정원 10명당 요양보호사", R.ops.cwPer10 != null ? R.ops.cwPer10 + "명" : "–", `${n(R.ops.n)}곳 기준`)}${kpi("1식 식재료비", R.ops.foodMed != null ? n(R.ops.foodMed) + "원" : "–", "비급여 신고 기준")}${R.ops.rooms ? kpi("침실 구성", Object.entries(R.ops.rooms).map(([k, v]) => `${k.replace("인실", "")}인 ${n(v)}`).join(" · "), "실 수 합계") : ""}</div>`;
+  // ===== 4. 신규 진입 =====
+  h += H2("신규 진입 흐름");
+  const mx = Math.max(1, ...R.newByYear.map((x) => x.n));
+  h += `<div class="chart"><b style="font-size:.9rem">해마다 새로 지정된 기관 (지금 운영 중인 곳 기준)</b>${R.newByYear.map((x, i) => `<div class="yb"><span>${x.y}</span><i class="${i === R.newByYear.length - 1 ? "ac" : ""}" style="width:${x.n / mx * 100}%"></i><span>${x.n}곳</span></div>`).join("")}</div>`;
+  const e4 = [];
+  if (F.entry) e4.push(`${F.entry.from}년 이후 해마다 평균 ${F.entry.avg}곳이 새로 지정됐습니다. 진입이 꾸준하다는 것은 새 기관이 들어설 자리가 계속 생긴다는 뜻이기도 하지만, 그만큼 경쟁도 계속 늘어난다는 뜻입니다.`);
+  if (newO != null && S.occ != null) {
+    const gap = S.occ - newO;
+    e4.push(gap >= 5 ? `아직 평가를 받지 않은 신규 기관 ${n(R.newOcc.n)}곳의 이용률은 <b>${newO}%</b>로, 지역 평균(${S.occ}%)보다 ${pp(gap)} 낮습니다. 처음 1~2년은 정원을 다 채우지 못한다고 보고 자금 계획을 세우시는 것이 안전합니다.`
+      : `신규 기관 ${n(R.newOcc.n)}곳의 이용률은 ${newO}%로 지역 평균(${S.occ}%)과 큰 차이가 없습니다. 이 지역은 새 기관도 비교적 빨리 채워지는 편입니다.`);
+  } else e4.push("최근 3년 안에 지정된 신규 기관이 없거나 적어, 신규 기관의 채움 속도는 이 지역 자료로 가늠하기 어렵습니다.");
+  h += `<p>${e4.join(" ")}</p>`;
 
-  // 5. 손익
+  // ===== 5. 운영 비교 =====
+  h += H2("운영 비교");
+  const O = F.ops || {};
+  const o5 = [];
+  if (O.cw) o5.push(`요양보호사 1명이 ${who} 약 ${O.cw.med}명을 맡는 수준으로 인력을 두고 있으며`);
+  if (O.single) o5.push(`1인실 비율은 ${O.single.pct}%${O.single.pct < 20 ? "로 적고" : "이고"}`);
+  if (O.food) o5.push(`식재료비는 1식 ${n(O.food.med)}원 안팎입니다`);
+  if (o5.length) h += `<p>${esc(sg)} ${esc(KN)}${ps(KN, "은", "는")} ${o5.join(", ")}. 새로 들어가는 기관이 비용과 서비스 수준을 정할 때 기준이 되는 숫자입니다.</p>`;
+  const opsRows = [
+    O.cw ? `<tr><td class="l">요양보호사 1명당 ${who}</td><td class="l">중간값 ${O.cw.med}명 (${O.cw.lo}~${O.cw.hi}명)</td><td class="l">${who} ${O.minNow}명 이상 ${n(O.cw.n)}곳</td></tr>` : "",
+    O.nurse ? `<tr><td class="l">간호사·간호조무사 1명당 ${who}</td><td class="l">중간값 ${O.nurse.med}명</td><td class="l">${n(O.nurse.n)}곳</td></tr>` : "",
+    O.single ? `<tr><td class="l">1인실 비율</td><td class="l">${O.single.pct}% (침실 ${n(O.single.of)}개 중 ${n(O.single.n)}개)</td><td class="l">1~4인실 합계</td></tr>` : "",
+    O.food ? `<tr><td class="l">식재료비 (1식)</td><td class="l">중간값 ${n(O.food.med)}원 (${n(O.food.lo)}~${n(O.food.hi)}원)</td><td class="l">신고 ${n(O.food.n)}곳</td></tr>` : "",
+    O.room && R.kind !== "daycare" ? `<tr><td class="l">상급침실 사용료 (하루)</td><td class="l">중간값 ${n(O.room.med)}원</td><td class="l">신고 ${n(O.room.n)}곳</td></tr>` : "",
+  ].filter(Boolean);
+  if (opsRows.length) h += table(["항목", `${esc(sg)} 수준`, "기준"], opsRows);
+  else h += `<div class="kpis">${kpi("정원 10명당 요양보호사", R.ops.cwPer10 != null ? R.ops.cwPer10 + "명" : "–", `${n(R.ops.n)}곳 기준`)}${kpi("1식 식재료비", R.ops.foodMed != null ? n(R.ops.foodMed) + "원" : "–", "비급여 신고 기준")}</div>`;
+  h += `<p>${who}당 인력이 많을수록 돌봄의 질은 좋아지지만 인건비가 늘어납니다.${R.kind === "home" ? ` 요양원은 ${who} 2.3명당 요양보호사 1명 이상이 기준이며 2.1명으로 강화되는 중입니다.` : R.kind === "daycare" ? ` 주야간보호는 이용자 7명당 요양보호사 1명 이상이 기준입니다.` : ""}${O.single && O.single.pct < 20 ? " 1인실이 적다는 것은 1인실을 찾는 보호자에게 내세울 차이가 될 수 있다는 뜻이기도 합니다." : ""}${full ? "" : " 상세 리포트에는 기관별 요양보호사 수와 평가 이력을 넣습니다."}</p>`;
+
+  // ===== 6. 손익 =====
   const A = R.plStd.assume;
-  h += `<h2>5. 표준 가정 손익</h2><p>이 지역에 같은 종류의 기관을 열 때 정원별로 손익이 어떻게 되는지 표준 가정으로 계산했습니다.</p>`;
-  h += table(["정원", "1명당 월 매출", "월 고정비", "손익분기 이용률", "이용률 80% 손익", "이용률 95% 손익"], R.plStd.rows.map((r) => `<tr><td>${r.cap}인</td><td>${man(r.perUser.month)}</td><td>${man(r.fixed)}</td><td><b>${r.be}%</b></td><td>${sgn(r.rows[1].profit)}</td><td>${sgn(r.rows[3].profit)}</td></tr>`));
-  h += `<p class="muted small">가정: 2026년 수가, 이용자 등급 구성 ${Object.entries(A.mix).map(([g, w]) => `${g}등급 ${Math.round(w * 100)}%`).join(" · ")}, 월 ${A.days}일 이용, 인건비 = 이용률 95% 매출의 ${Math.round(A.laborRatio * 100)}%, 임차 면적 정원 1명당 ${A.areaPy}평 × 평당 월 3만 원, 기타 운영비 정원 1명당 월 ${man(A.otherPerCap)}. 식재료비 등 비급여 수입과 가산·감산은 넣지 않았습니다.</p>`;
+  h += H2("손익 모의계산");
+  const beCmp = newO != null ? (Math.abs(be - newO) < 2 ? `${esc(sg)} 신규 기관의 평균 이용률(${newO}%)이 이 선과 거의 같아, 신규 기관 평균만큼 채우면 겨우 본전이라는 점이 핵심입니다.` : newO < be ? `${esc(sg)} 신규 기관의 평균 이용률(${newO}%)이 이 선보다 ${r1(be - newO)}%p 낮다는 점이 핵심입니다.` : `${esc(sg)} 신규 기관의 평균 이용률(${newO}%)이 이 선보다 높아, 계획대로 채우면 흑자를 기대할 수 있는 구조입니다.`) : S.occ != null ? `지역 평균 이용률은 ${S.occ}%입니다.` : "";
+  h += `<p>아래 가정으로 계산하면 <b>이용률 약 ${be}%가 손익분기점</b>입니다. ${beCmp}</p>`;
+  h += table(["정원", "손익분기 이용률", "이용률 70%", "이용률 85%", "이용률 95%"], R.plStd.rows.map((r) => `<tr><td>${r.cap}인</td><td><b>${r.be}%</b></td><td>월 ${sgn(at(r, 70).profit)}</td><td>월 ${sgn(at(r, 85).profit)}</td><td>월 ${sgn(at(r, 95).profit)}</td></tr>`));
+  const fee = R.kind === "home" ? "1등급 93,070원, 2등급 86,340원, 3~5등급 81,540원(하루)" : R.kind === "daycare" ? "8~10시간 기준 1등급 69,730원 ~ 5등급 56,360원(하루)" : "1등급 74,060원 ~ 5등급 60,000원(하루)";
+  h += `<h3>계산에 쓴 가정</h3>${li([
+    `매출: 2026년 수가 — ${fee}. ${who} 등급 구성을 ${Object.entries(A.mix).map(([g, w]) => `${g}등급 ${Math.round(w * 100)}%`).join("·")}로, 월 ${A.days}일 이용으로 가정 → ${who} 1명 월 약 ${man(pl50.perUser.month)}(공단 부담 + 본인부담). 가산·감산은 뺍니다.`,
+    `인건비: 정원을 95% 채웠을 때 매출의 ${Math.round(A.laborRatio * 100)}%를 고정비로 봅니다(${who}가 줄어도 인력은 바로 줄이기 어렵기 때문입니다).`,
+    `임대료: 정원 1명당 ${A.areaPy}평, 평당 월 3만 원으로 가정(${pl50.cap}인 약 ${man(pl50.rent)}).`,
+    `기타 운영비: 정원 1명당 월 ${man(A.otherPerCap)}(공과금·소모품·보험·차량 등).`,
+    `식재료비 같은 비급여는 보호자가 내는 수입과 재료 구입비가 비슷하다고 보고 뺍니다.`])}`;
+  h += `<p>이 계산은 규모가 달라도 손익분기점이 비슷하게 나오는 단순 모형입니다. 실제로는 시설장·사회복지사·조리원처럼 규모와 상관없이 두는 인력 때문에 <b>작은 기관일수록 손익분기점이 높아집니다.</b>${small && small.occ != null && sizeGap >= 5 ? ` ${esc(sg)} ${small.label} 기관의 이용률이 ${small.occ}%에 머물러 있다는 점도 함께 보셔야 합니다.` : ""}${R.custom ? "" : " 맞춤형 종합 분석에서는 의뢰하신 분의 실제 임대료·인력 계획으로 다시 계산합니다."}</p>`;
   if (R.rampStd) h += `<h3>개원 후 운영자금 (정원 ${R.rampStd.cap}인, 표준 가정)</h3>` + rampSvg(R.rampStd.series, `정원 ${R.rampStd.cap}인 · 개원 후 누적 손익`) + rampText(R.rampStd.series);
 
-  // 6. 맞춤형
+  // ===== 맞춤형 =====
   if (R.custom) {
     const C = R.custom, I = C.inputs, pl = C.pl;
-    h += `<h2>6. 의뢰 조건 맞춤 분석</h2>` + table(["항목", "조건"], [
+    h += H2("의뢰 조건 맞춤 분석") + table(["항목", "조건"], [
       `<tr><td>정원</td><td>${I.cap}인</td></tr>`, `<tr><td>월 임대료</td><td>${man(I.rent)}</td></tr>`,
       `<tr><td>월 인건비</td><td>${man(I.labor)}${I.laborGiven ? "" : " (적지 않으셔서 표준 가정 적용)"}</td></tr>`,
       `<tr><td>기타 운영비</td><td>${man(I.other)}${I.otherGiven ? "" : " (표준 가정)"}</td></tr>`,
       I.invest ? `<tr><td>초기 투자(인테리어·장비 등)</td><td>${man(I.invest)}</td></tr>` : "", I.deposit ? `<tr><td>보증금</td><td>${man(I.deposit)} (회수되는 돈이라 손익에는 넣지 않음)</td></tr>` : "",
       R.kind === "daycare" ? `<tr><td>월 이용일</td><td>${I.days}일</td></tr>` : "", I.addr ? `<tr><td>예정지</td><td>${esc(I.addr)}</td></tr>` : ""].filter(Boolean));
-    h += `<h3>월 손익</h3><p>이용자 1명당 월 매출은 약 ${man(pl.perUser.month)}, 매달 고정비는 ${man(pl.fixed)}입니다. <b>손익분기 이용률은 ${pl.be}%</b>(약 ${Math.ceil(pl.cap * pl.be / 100)}명)입니다.</p>` + plTable(pl);
+    h += `<h3>월 손익</h3><p>${who} 1명당 월 매출은 약 ${man(pl.perUser.month)}, 매달 고정비는 ${man(pl.fixed)}입니다. <b>손익분기 이용률은 ${pl.be}%</b>(약 ${Math.ceil(pl.cap * pl.be / 100)}명)입니다.${newO != null ? ` 이 지역 신규 기관 평균 이용률(${newO}%)${newO >= pl.be ? "보다 낮아, 신규 기관 평균만큼 채우면 흑자 구간입니다." : "보다 높아, 신규 기관 평균보다 빨리 채워야 흑자로 돌아섭니다."}` : ""}</p>` + plTable(pl);
     h += `<h3>개원 후 운영자금${I.invest ? " (초기 투자 포함)" : ""}</h3>` + rampSvg(C.ramp, `정원 ${I.cap}인 · 개원 후 누적 손익`) + rampText(C.ramp);
     h += `<h3>조건이 바뀌면 (손익분기 이용률)</h3>` + table(["인건비 \\ 임대료", "임대료 −20%", "지금 조건", "임대료 +20%"], C.sens.map((r) => `<tr><td>인건비 ${r.dl ? (r.dl > 0 ? "+" : "−") + Math.abs(r.dl * 100) + "%" : "지금 조건"}</td>${r.cells.map((c, i) => `<td>${r.dl === 0 && i === 1 ? `<b>${c}%</b>` : c + "%"}</td>`).join("")}</tr>`));
     h += `<h3>요양보호사 인력 점검</h3><p>정원 ${I.cap}인이면 요양보호사는 법정 기준(이용자 ${C.staff.ratio}명당 1명)으로 <b>최소 ${C.staff.minCw}명</b>이 필요합니다. 1명 월 ${man(C.staff.wage)}(급여·4대보험·퇴직금 포함 가정)이면 요양보호사 인건비만 약 ${man(C.staff.minCost)}로, 적어 주신 월 인건비의 ${C.staff.share ?? "–"}%입니다.${C.staff.share > 75 ? " <b>시설장·사회복지사·간호(조무)사·조리원 등 다른 직원 인건비가 빠듯할 수 있습니다.</b>" : ""}</p><p class="muted small">인력 배치 기준은 기관 종류·정원 구간·치매전담실 여부에 따라 다르고 바뀔 수 있으니, 지정 신청 전에 관할 시·군·구에서 최신 기준을 꼭 확인하세요.</p>`;
@@ -176,14 +304,40 @@ function render(R) {
     } else if (C.nearErr || I.addr) h += `<p class="note">예정지 주소로 위치를 찾지 못해 반경 분석을 넣지 못했습니다. 주소를 알려 주시면 다시 만들어 드립니다.</p>`;
   }
 
-  h += `<h2>읽을 때 참고하실 점</h2><ul class="small">
-    <li>이 보고서는 국민건강보험공단 장기요양기관 공개 정보와 행정안전부 주민등록인구를 케어온길이 모아 계산한 참고 자료입니다.</li>
-    <li>요양시설은 자녀 집 근처로 고르는 경우가 많아, 어르신 주소지 인구와 실제 이용 지역은 다를 수 있습니다.</li>
-    <li>손익은 가정에 따라 크게 달라지는 모의계산이며 수익을 보장하지 않습니다. 창업 판단은 현장 조사, 관할 지자체 지정 기준 확인, 전문가 상담과 함께 하시길 권해 드립니다.</li>
-    <li>케어온길은 특정 지역이나 기관을 추천하거나 평가하지 않습니다.</li></ul>
-    <p class="meta small">주식회사 벤투런 · 케어온길 비즈 · www.careongil.kr/biz · moongoldenj@naver.com</p>`;
+  // ===== 시사점 =====
+  h += H2("시사점과 확인할 것");
+  const conclude = {
+    high: useL !== "low" ? "수요는 탄탄하지만 자리도 많아서, 새 기관은 규모·품질·초기 자금력으로 경쟁하는 시장으로 보입니다." : "자리가 많고 남는 자리도 많아, 차별점 없이 들어가면 채우기 어려운 시장으로 보입니다.",
+    mid: "평균적인 시장이라, 입지와 규모, 첫 평가 준비가 결과를 가르는 곳으로 보입니다.",
+    low: useL !== "low" ? "고령 인구에 비해 자리가 적고 잘 채워져, 진입 여지가 있는 시장으로 보입니다. 다만 수요가 이웃 지역으로 이어져 있는지 현장에서 확인해 보셔야 합니다." : "자리도 적고 이용률도 낮아, 수요가 실제로 있는지부터 신중히 확인하셔야 하는 시장입니다.",
+  }[capL];
+  const tips = [];
+  const beRef = R.custom ? R.custom.pl.be : be;
+  if (newO != null) tips.push(newO < beRef + 2 ? `<b>채우는 기간을 버틸 자금:</b> 신규 기관 평균 이용률(${newO}%)이 손익분기점(약 ${beRef}%)${newO < beRef - 1 ? " 아래입니다" : "과 거의 같습니다"}. 처음 1~2년의 적자를 예상하고 운영자금을 준비하셔야 합니다.` : `<b>초기 채움 속도:</b> 신규 기관 평균 이용률(${newO}%)이 손익분기점(약 ${beRef}%)보다 높습니다. 그래도 개원 첫해에는 이보다 낮게 시작하니, 몇 달 치 운영자금은 준비해 두시는 것이 안전합니다.`);
+  if (sizeGap >= 5) tips.push(`<b>규모:</b> ${big.label} 기관의 이용률(${big.occ}%)이 높고, ${small.label}(${small.occ}%)는 낮습니다. 작게 시작하신다면 차별점(1인실, 치매 전문 돌봄, 프로그램 등)이 더 필요합니다.`);
+  if (gA?.wait && S.wait && gA.wait / S.wait >= 0.4) tips.push(`<b>평가가 수요를 끌어옵니다:</b> 대기의 ${Math.round(gA.wait / S.wait * 100)}%가 A등급에 몰려 있습니다. 첫 공단 평가를 염두에 둔 운영 기록과 인력 배치가 중요합니다.`);
+  const altPeer = peers.filter((x) => x.p80 && S.pop?.p80 && x.p80 >= S.pop.p80 * 0.7 && x.capPer1k80 != null && S.capPer1k80 && x.capPer1k80 < S.capPer1k80 * 0.7).sort((a, b) => a.capPer1k80 - b.capPer1k80)[0];
+  if (altPeer) tips.push(`<b>인근 지역:</b> ${esc(altPeer.nm)}는 80세 이상 인구가 ${n(altPeer.p80)}명인데 1,000명당 정원이 ${altPeer.capPer1k80}명으로 ${esc(sg)}(${S.capPer1k80}명)보다 훨씬 적습니다(이용률 ${p(altPeer.occ)}). 함께 검토해 볼 만합니다.`);
+  if (O.cw && R.kind === "home" && O.cw.med > 2.1) tips.push(`<b>인력 기준:</b> 이 지역 요양원은 요양보호사 1명당 ${who} ${O.cw.med}명 수준입니다. 기준이 2.1명으로 강화되는 중이라 인건비가 늘어날 수 있습니다.`);
+  h += `<p><b>${esc(sg)}${ps(sg, "은", "는")} ${conclude}</b></p>${li(tips)}`;
+  const chk = R.kind === "daycare"
+    ? [`${esc(R.region.sgg_nm.split(" ")[0])}의 주야간보호 신규 지정 기준과 절차 (담당 부서 문의)`, "후보 건물의 용도·면적·층수(엘리베이터)가 시설 기준에 맞는지", "송영 차량 운행 범위와 차량·운전 인력 비용", "실제 임대료와 인건비로 손익 다시 계산", "주변 기관 3~5곳 방문 상담 (대기, 프로그램, 송영 범위)", "요양보호사 등 인력 구인 여건"]
+    : [`${esc(R.region.sgg_nm.split(" ")[0])}의 ${R.kind === "home" ? "노인요양시설" : "단기보호"} 신규 지정 기준과 절차 (담당 부서 문의)`, "후보 건물의 용도·면적이 시설 기준에 맞는지", "실제 임대료와 인건비로 손익 다시 계산", "주변 기관 3~5곳 방문 상담 (대기, 비급여, 분위기)", "요양보호사·간호 인력 구인 여건"];
+  h += `<h3>꼭 확인하실 것</h3>${li(chk)}`;
+  h += `<h3>데이터와 한계</h3><div class="small">${li([
+    `기관 정보: 국민건강보험공단 장기요양기관 검색·상세 정보(공공데이터포털). 정원·현원·대기·인력·비급여는 기관이 공단에 신고한 값이라 실제와 다를 수 있습니다.`,
+    `평가 등급: 국민건강보험공단 장기요양기관 평가 결과. 최근 평가 기준이며 그 뒤 운영이 달라졌을 수 있습니다.`,
+    `인구: 행정안전부 주민등록 인구 (${esc(R.popYm || "")} 기준).`,
+    `수가: 보건복지부 2026년 장기요양급여비용 고시.`,
+    `이용률: 현원 ÷ 정원. 현원을 신고하지 않은 기관은 빼고 계산해, 케어온길 화면의 수치와 조금 다를 수 있습니다.`,
+    `한계: ${who}의 주소는 공개되지 않아 다른 지역에서 오는 수요는 추정입니다. 손익 모의계산은 가정에 따른 어림값이며, 수익을 보장하거나 투자·창업을 권하는 자료가 아닙니다.`])}</div>`;
+  h += `<p class="muted small">케어온길은 특정 지역이나 기관을 추천하거나 평가하지 않습니다. 기관 이름과 숫자는 공단이 공개한 자료 그대로입니다.</p>`;
+  if (!full) h += `<p class="note"><b>상세 리포트에 더 들어가는 것:</b> 기관 ${n(S.n)}곳 전체 목록과 기관별 평가 이력·요양보호사 수, 5년 뒤 고령 인구 전망, ${esc(R.region.sido_nm)} 시·군·구 전체 비교, 개원 후 운영자금 그래프</p>`;
+  h += `<p class="meta small">주식회사 벤투런 · 케어온길 비즈 · www.careongil.kr/biz · moongoldenj@naver.com</p>`;
   $("#doc").innerHTML = h; $("#doc").hidden = false; $("#msg").hidden = true;
 }
+const ps = (w, a, b) => { const c = String(w).charCodeAt(String(w).length - 1) - 0xac00; return c >= 0 && c <= 11171 && c % 28 ? a : b; };
+const jo = (w, a, b) => { const c = String(w).charCodeAt(String(w).length - 1) - 0xac00; return w + (c >= 0 && c <= 11171 && c % 28 ? a : b); };
 (async () => {
   try {
     const r = await fetch("/api/order?report=1&t=" + encodeURIComponent(t));
