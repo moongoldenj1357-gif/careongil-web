@@ -1,6 +1,7 @@
 // 케어온길 AI 상담 — Claude Haiku. 대화 내용은 저장하지 않고, 하루 사용 횟수만 셈.
 //  POST /api/chat  { messages: [{role:"user"|"assistant", content:"..."}], ctx: ["기관기호:유형코드", ...] }
 //  실버타운·양로원 페이지: { messages, scope: "silver", sctx: [시설번호, ...] }  (silver_facilities, 하루 횟수는 같이 셈)
+//  지역 리포트 페이지: { messages, scope: "report", t: 보고서 열쇠 }  → 발행된 보고서 숫자를 DB에서 읽어 그 안에서 설명 (보고서마다 하루 REPORT_CHAT_DAILY(기본 30)번)
 //  → { reply, left }   (left = 오늘 남은 횟수)
 //  하루 한도: 1인(IP 기준, 해시로만 보관) CHAT_USER_DAILY(기본 10) · 사이트 전체 CHAT_SITE_DAILY(기본 300)
 import { createHash } from "node:crypto";
@@ -54,6 +55,53 @@ const SYSTEM = `당신은 '케어온길'의 AI 상담 도우미입니다. 케어
 - 환불: 보고서 발행 전에는 전액 환불. 발행 뒤에는 디지털 콘텐츠라 전자상거래법 제17조에 따라 청약철회가 제한되며, 그래서 견본을 미리 공개함. 데이터 처리 오류 등 사실과 다른 내용이 있으면 바로잡아 다시 발행하거나 환불.
 - 문의: 주식회사 벤투런 031-818-6336, moongoldenj@naver.com.
 - 비즈 관련 질문에는 위 내용 안에서만 답하고, 세금 신고 방법이나 회계 처리처럼 위에 없는 것은 단정하지 말고 담당 세무사나 회사 문의처를 안내합니다. 리포트 구매를 강하게 권하지 않습니다.`;
+
+// 지역 리포트(케어온길 비즈 유료 보고서)를 읽은 분의 질문에 쓰는 지침
+const REPORT_SYSTEM = `
+
+[지금 상황] 사용자는 케어온길 비즈 지역 리포트를 구매해서 읽고 있는, 장기요양기관 창업·운영을 준비하는 분입니다. 아래 [보고서 자료]의 숫자와 내용을 쉽게 풀어 설명하는 것이 역할입니다. 앞의 보호자용 말투 지침은 그대로 따르되, 보호자 위로보다 사업 판단에 필요한 설명에 집중합니다.
+
+답하는 방법
+- 숫자는 [보고서 자료]에 있는 것만 씁니다. 자료에 없는 숫자(임대료 시세, 다른 지역의 이용률 등)는 지어내지 말고 "이 보고서에는 없는 자료"라고 말한 뒤 확인할 곳을 알려 줍니다. 다른 시·군·구 숫자는 [보고서 자료]의 시·군·구 표에 있으면 그대로 써도 됩니다.
+- 용어를 물으면 ① 뜻 ② 이 보고서의 실제 숫자로 예시 계산 ③ 창업 판단에서 어떻게 보면 되는지 순서로 설명합니다. 예: "80세 이상 1,000명당 정원 47명"은 80세 이상 어르신 1,000명이 있을 때 그 지역 기관 자리가 47개라는 뜻이고, 거꾸로 하면 어르신 약 21명당 1자리입니다.
+- "어디에 창업하는 게 유리한가요?" 같은 질문에는 어느 곳이 낫다고 단정하거나 권하지 않습니다. 대신 한 숫자만으로 판단하면 안 되는 이유와, 함께 봐야 할 숫자(80세 이상 인구 수, 1,000명당 정원=공급, 이용률, 대기, 신규 기관 이용률, 기관평가 분포, 임대료·인력 구하기)를 보고서 숫자로 비교해 보여 주고, 결정은 사용자가 현장 조사와 함께 하도록 안내합니다. 다른 지역을 자세히 보려면 그 지역 리포트나 무료 지역 현황(www.careongil.kr/area)을 볼 수 있다고 알려 줍니다.
+- 고령화율은 "전체 인구 중 65세 이상 비율"이라 비율이 높아도 어르신 수가 적을 수 있고, 수요는 어르신 수와 이미 있는 자리 수(공급)를 함께 봐야 한다는 점을 짚어 줍니다. 요양원은 80세 이상, 주야간보호는 75세 이상 인구가 더 직접적인 수요입니다.
+- 중간값은 값을 작은 순서로 줄 세웠을 때 가운데 값입니다. 평균은 아주 크거나 작은 값 하나에 끌려가지만 중간값은 덜 흔들려서, 기관마다 차이가 큰 인력·비급여 같은 숫자에 씁니다. 괄호 속 범위(예: 1.23~2.75명)는 하위 10%~상위 10% 사이로, 대부분의 기관이 이 안에 있다는 뜻입니다.
+- 이용률 = 현원 ÷ 정원, 남는 자리 = 정원 − 현원, 대기 = 기관이 공단에 신고한 대기 인원, 손익분기 이용률 = 고정비를 매출로 겨우 메우는 이용률, 신규 기관 = 최근 3년 안에 지정되어 아직 평가를 받지 않은 기관입니다.
+- 손익은 표준 가정에 따른 모의계산이라 실제 임대료·인건비로 다시 계산해야 한다는 점을 필요할 때 짚습니다. 수익을 보장하는 말, 투자·대출·세무 판단은 하지 않습니다.
+- 보고서 숫자가 틀린 것 같다는 지적에는, 공단에 기관이 신고한 값이라 실제와 다를 수 있다고 설명하고, 처리 오류로 보이면 신청번호와 함께 회사(031-818-6336, moongoldenj@naver.com)로 알려 주시면 확인해 다시 발행해 드린다고 안내합니다.
+- 답은 4~10문장. 계산이 필요하면 한 줄씩 짧게 보여 줍니다. 마크다운 표·제목은 쓰지 않습니다.`;
+
+const r1 = (x) => Math.round(x * 10) / 10;
+// 보고서 열쇠로 발행된 보고서를 읽어 AI가 참고할 요약을 만듦 (사용자가 보낸 숫자는 믿지 않음)
+async function reportFacts(t) {
+  if (!/^[A-Za-z0-9_-]{20,64}$/.test(String(t || ""))) return null;
+  const [o] = await sb("GET", `report_orders?select=no,status,report&token=eq.${t}`);
+  if (!o || o.status !== "done" || !o.report) return null;
+  const R = o.report, S = R.sgg || {}, D = R.sido || {}, F = R.facts || {}, place = `${R.region.sido_nm} ${R.region.sgg_nm}`;
+  const L = [];
+  L.push(`보고서: ${R.product_nm} · 신청번호 ${o.no} · ${place} ${R.kind_nm} · 발행 ${String(R.made_at).slice(0, 10)} · 인구 기준 ${R.popYm || "-"}`);
+  L.push(`이 지역: 기관 ${S.n}곳, 정원 ${S.capacity}명, 현원 ${S.now}명, 이용률 ${S.occ}%, 남는 자리 ${S.vacancy}, 대기 ${S.wait}명, 최근 3년 신규 지정 ${S.new3y}곳, 80세 이상 1,000명당 정원 ${S.capPer1k80 ?? "-"}명`);
+  if (S.pop) L.push(`이 지역 인구: 전체 ${S.pop.total}, 65세 이상 ${S.pop.p65}(고령화율 ${S.pop.aged}%), 75세 이상 ${S.pop.p75}, 80세 이상 ${S.pop.p80}, 85세 이상 ${S.pop.p85}`);
+  L.push(`${R.region.sido_nm} 전체: 기관 ${D.n}곳, 정원 ${D.capacity}명, 이용률 ${D.occ}%, 대기 ${D.wait}명, 80세 이상 1,000명당 정원 ${D.capPer1k80 ?? "-"}명${D.pop ? `, 고령화율 ${D.pop.aged}%, 80세 이상 ${D.pop.p80}` : ""}`);
+  if (F.densRank) L.push(`80세 이상 1,000명당 정원 순위: ${R.region.sido_nm} ${F.densRank.of}개 시·군·구 중 ${F.densRank.rank}번째로 높음 / 정원 규모 ${F.capRank?.rank}번째`);
+  L.push(`${R.region.sido_nm} 시·군·구 표 (이름 | 기관 | 정원 | 이용률 | 대기 | 신규3년 | 전체인구 | 65세+ | 고령화율 | 80세+ | 80세+ 1,000명당 정원):`);
+  for (const x of R.sggs || []) L.push(`  ${x.me ? "★" : ""}${x.nm} | ${x.n} | ${x.capacity} | ${x.occ ?? "-"}% | ${x.wait} | ${x.new3y} | ${x.total ?? "-"} | ${x.p65 ?? "-"} | ${x.aged ?? "-"}% | ${x.p80 ?? "-"} | ${x.capPer1k80 ?? "-"}`);
+  L.push(`규모별: ${(R.bySize || []).map((x) => `${x.label} ${x.n}곳 정원 ${x.cap} 이용률 ${x.occ}% 대기 ${x.wait}`).join(" / ")}`);
+  L.push(`평가등급별: ${(R.byGrade || []).map((x) => `${x.label} ${x.n}곳 이용률 ${x.occ}% 대기 ${x.wait}`).join(" / ")}`);
+  if (R.newOcc?.n) L.push(`신규 기관(최근 3년, 평가 전) ${R.newOcc.n}곳 이용률 ${R.newOcc.occ}%`);
+  L.push(`해마다 새로 지정: ${(R.newByYear || []).map((x) => `${x.y} ${x.n}곳`).join(", ")}`);
+  if (F.waitTop) L.push(`대기 쏠림: 1위 기관 대기 ${F.waitTop.w1}명(정원 ${F.waitTop.cap1}), 상위 2곳 ${F.waitTop.w2}명, 대기 있는 기관 ${F.waitTop.n}곳`);
+  if (F.gradeChange?.n) L.push(`평가 2회 이상 ${F.gradeChange.n}곳 중 등급이 바뀐 곳 ${F.gradeChange.changed}곳`);
+  const O = F.ops || {};
+  L.push(`운영(중간값): 요양보호사 1명당 이용자 ${O.cw ? `${O.cw.med}명(하위10%~상위10% ${O.cw.lo}~${O.cw.hi}, ${O.cw.n}곳)` : "-"}, 간호인력 1명당 ${O.nurse?.med ?? "-"}명, 1식 식재료비 ${O.food ? `${O.food.med}원(${O.food.lo}~${O.food.hi})` : "-"}, 상급침실료 하루 ${O.room?.med ?? "-"}원, 1인실 비율 ${O.single?.pct ?? "-"}%`);
+  if (R.top) L.push(`정원 상위 기관: ${R.top.map((r) => `${r.name}(지정 ${r.y}, 정원 ${r.cap}, 현원 ${r.now}, 이용률 ${r.occ}%, 대기 ${r.wait}, 평가 ${r.grade || "-"})`).join("; ")}`);
+  const A = R.plStd?.assume;
+  if (R.plStd) L.push(`표준 손익(가정: 인건비 = 이용률 95% 매출의 ${Math.round(A.laborRatio * 100)}%, 임차 정원 1명당 ${A.areaPy}평×평당 3만 원, 기타 정원 1명당 월 ${A.otherPerCap}원, 이용자 1명 월 매출 ${R.plStd.rows[0].perUser.month}원): ${R.plStd.rows.map((r) => `${r.cap}인 고정비 월 ${r.fixed}원 손익분기 ${r.be}% (${r.rows.map((x) => `${x.occ}%→${x.profit}원`).join(", ")})`).join(" / ")}`);
+  if (R.outlook?.sgg) { const q = R.outlook.sgg; L.push(`5년 뒤 추정(생존율 반영, 전입·전출 제외): 75세+ ${q.a75.now}→${q.a75.fut}(${q.a75.pct}%), 80세+ ${q.a80.now}→${q.a80.fut}(${q.a80.pct}%), 85세+ ${q.a85.now}→${q.a85.fut}(${q.a85.pct}%)`); }
+  if (R.custom) { const C = R.custom, I = C.inputs; L.push(`맞춤 조건: 정원 ${I.cap}, 월 임대료 ${I.rent}, 월 인건비 ${I.labor}${I.laborGiven ? "" : "(표준 가정)"}, 기타 ${I.other}, 초기투자 ${I.invest || 0}, 손익분기 ${C.pl.be}%, 최소 요양보호사 ${C.staff.minCw}명${C.near ? `, 예정지 반경: ${C.near.rings.map((r) => `${r.k}km ${r.n}곳 이용률 ${r.occ}%`).join(", ")}` : ""}`); }
+  return L.join("\n");
+}
 
 // 실버타운·양로원 페이지(/silver)에서 쓰는 추가 지침
 const SILVER_SYSTEM = `
@@ -127,15 +175,22 @@ export default async function handler(req, res) {
 
   try {
     // 하루 횟수 확인 (IP는 해시로만 씀)
+    const isReport = body?.scope === "report";
+    let rf = null;
+    if (isReport) { rf = await reportFacts(body?.t).catch(() => null); if (!rf) return res.status(403).json({ 오류: "발행된 보고서를 찾지 못했습니다. 보고서 화면을 새로 고친 뒤 다시 물어봐 주세요." }); }
     const ip = String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "").split(",")[0].trim();
-    const who = createHash("sha256").update(ip + "|" + SB_KEY.slice(-16)).digest("hex").slice(0, 32);
-    const take = await sb("POST", "rpc/chat_take", { p_who: who, p_user_max: USER_MAX, p_site_max: SITE_MAX });
+    // 보고서 질문은 보고서마다 따로 셈 (보고서 열쇠를 해시로만 씀)
+    const who = createHash("sha256").update((isReport ? "R|" + body.t : ip) + "|" + SB_KEY.slice(-16)).digest("hex").slice(0, 32);
+    const userMax = isReport ? Number(process.env.REPORT_CHAT_DAILY || 30) : USER_MAX;
+    const take = await sb("POST", "rpc/chat_take", { p_who: who, p_user_max: userMax, p_site_max: SITE_MAX });
     if (!take?.ok) {
-      const msg = take?.why === "site" ? "오늘 AI 상담이 모두 마감되었습니다. 내일 다시 이용해 주시면 감사하겠습니다. 위의 자주 묻는 질문은 계속 보실 수 있습니다." : `오늘 무료 상담 ${USER_MAX}번을 모두 이용하셨습니다. 내일 다시 이용해 주시면 감사하겠습니다. 위의 자주 묻는 질문은 계속 보실 수 있습니다.`;
+      const msg = take?.why === "site" ? "오늘 AI 상담이 모두 마감되었습니다. 내일 다시 이용해 주시면 감사하겠습니다. 위의 자주 묻는 질문은 계속 보실 수 있습니다." : `오늘 무료 질문 ${userMax}번을 모두 이용하셨습니다. 내일 다시 이용해 주시면 감사하겠습니다. 위의 자주 묻는 질문은 계속 보실 수 있습니다.`;
       return res.status(429).json({ 오류: msg, left: 0 });
     }
     let system;
-    if (body?.scope === "silver") {
+    if (isReport) {
+      system = SYSTEM + REPORT_SYSTEM + `\n\n[보고서 자료] 사용자가 읽고 있는 보고서의 숫자입니다(서버에서 직접 읽음). 단위: 원·명·%.\n${rf}`;
+    } else if (body?.scope === "silver") {
       const f = await silverFacts(body?.sctx).catch(() => "");
       system = SYSTEM + SILVER_SYSTEM + `\n\n[시설 자료] ${f ? `사용자가 지금 보고 있거나 비교 중인 시설입니다. 시설별 사실은 이 자료로만 답합니다.\n${f}` : "지금 보고 있는 시설이 없습니다. 특정 시설을 물으면, 실버타운·양로원 페이지에서 시설을 찾아 '이 시설 AI에게 묻기'를 누르시면 저장된 정보로 답해 드릴 수 있다고 안내합니다."}`;
     } else {
