@@ -47,6 +47,18 @@ tr.me td{background:#fff7e0;font-weight:700}
 .yb i.ac{background:var(--main)}
 .tag{display:inline-block;background:var(--warm);color:#fff;border-radius:999px;padding:1px 9px;font-size:.78rem;font-weight:700;margin-left:6px;vertical-align:middle}
 #msg{padding:60px 0;text-align:center}
+.ask{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 22px;margin:0 0 40px}
+.ask h2{border:0;margin:0 0 6px;padding:0}
+.ask details{border-bottom:1px solid var(--line);padding:10px 0}.ask summary{cursor:pointer;font-weight:600}
+.ask details p{margin:8px 0 4px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.chips button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 11px;font:inherit;font-size:.85rem;cursor:pointer}
+.chatlog{display:flex;flex-direction:column;gap:8px;margin:12px 0;max-height:520px;overflow:auto}
+.bub{padding:10px 12px;border-radius:12px;white-space:pre-wrap;font-size:.92rem;max-width:92%}
+.bub.me{align-self:flex-end;background:var(--main);color:#fff}.bub.ai{align-self:flex-start;background:#f3efe6}
+.askrow{display:flex;gap:8px}.askrow textarea{flex:1;border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;min-height:48px;resize:vertical}
+.askrow button,.more{background:var(--main);color:#fff;border:0;border-radius:10px;padding:0 16px;font:inherit;font-weight:700;cursor:pointer}
+.more{background:none;color:var(--main);padding:2px 0;font-size:.85rem;font-weight:600}
+.asktip{background:var(--main-soft);border-radius:10px;padding:10px 12px;font-size:.9rem;margin:12px 0}
 @media print{
   @page{size:A4;margin:14mm}
   body{background:#fff;font-size:12px}
@@ -60,7 +72,8 @@ tr.me td{background:#fff7e0;font-weight:700}
 </head>
 <body>
 <div class="bar noprint"><div class="wrap"><a href="/biz">케어온길 비즈</a><span><a id="back" href="#">신청 확인</a> &nbsp; <button onclick="print()">PDF로 저장 · 인쇄</button></span></div></div>
-<div class="wrap"><div id="msg">보고서를 불러오는 중입니다…</div><article class="doc" id="doc" hidden></article></div>
+<div class="wrap"><div id="msg">보고서를 불러오는 중입니다…</div><article class="doc" id="doc" hidden></article>
+<section class="ask noprint" id="ask" hidden></section></div>
 <script>
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -166,6 +179,7 @@ function render(R) {
   if (F.entry && newO != null) key.push(`<b>${F.entry.avg >= 3 ? "진입은 꾸준하고" : "새 진입은 많지 않고"} ${S.occ - newO >= 5 ? "초기가 어렵습니다." : "신규 기관도 비교적 잘 채워집니다."}</b> ${F.entry.from}년 이후 해마다 ${F.entry.min === F.entry.max ? F.entry.min : `${F.entry.min}~${F.entry.max}`}곳이 새로 지정됐고, 아직 평가를 받지 않은 신규 기관 ${n(R.newOcc.n)}곳의 이용률은 ${newO}%입니다.`);
   if (R.custom) key.push(`<b>의뢰 조건의 손익분기 이용률은 ${R.custom.pl.be}%입니다.</b> 이 지역 평균 이용률(${p(S.occ)})${newO != null ? `, 신규 기관 평균(${newO}%)` : ""}과 비교해 보세요.`);
   h += `<div class="lead"><b>핵심 요약</b>${li(key)}</div>`;
+  h += `<p class="asktip noprint">💬 숫자의 뜻이나 해석이 궁금하시면 <a href="#ask">맨 아래 '보고서 풀이 · AI에게 묻기'</a>에서 무료로 물어보실 수 있습니다. 이 보고서의 숫자를 바탕으로 답해 드립니다.</p>`;
 
   // ===== 1. 수요 =====
   h += H2("수요: 고령 인구");
@@ -336,6 +350,57 @@ function render(R) {
   h += `<p class="meta small">주식회사 벤투런 · 케어온길 비즈 · www.careongil.kr/biz · moongoldenj@naver.com</p>`;
   $("#doc").innerHTML = h; $("#doc").hidden = false; $("#msg").hidden = true;
 }
+// ---------- 보고서 풀이 · AI에게 묻기 ----------
+function renderAsk(R) {
+  const S = R.sgg, D = R.sido, F = R.facts || {}, O = F.ops || {}, sg = R.region.sgg_nm, sd = R.region.sido_nm, who = R.kind === "home" ? "입소자" : "이용자";
+  const pl = R.plStd?.rows?.[1], newO = R.newOcc?.n ? R.newOcc.occ : null;
+  const QA = [];
+  if (S.capPer1k80 != null) {
+    const k = Math.round(1000 / S.capPer1k80), kd = D.capPer1k80 ? Math.round(1000 / D.capPer1k80) : null;
+    QA.push([`'80세 이상 1,000명당 정원 ${S.capPer1k80}명'은 무슨 뜻인가요?`, `${esc(sg)}에 사는 80세 이상 어르신 1,000명을 기준으로, 이 지역 ${esc(R.kind_nm)} 자리(정원)가 ${S.capPer1k80}개 있다는 뜻입니다. 계산은 정원 합계 ${n(S.capacity)}명 ÷ 80세 이상 인구 ${n(S.pop?.p80)}명 × 1,000입니다.<br>거꾸로 보면 어르신 약 <b>${k}명당 1자리</b>입니다.${kd ? ` ${esc(sd)} 평균은 ${D.capPer1k80}명, 즉 약 ${kd}명당 1자리입니다.` : ""}${F.densRank?.rank ? ` ${esc(sd)} ${F.densRank.of}개 시·군·구 중 ${F.densRank.rank}번째로 높다는 것은, 고령 인구에 비해 자리가 많은 쪽에서 ${F.densRank.rank}번째라는 뜻입니다.` : ""}<br>이 숫자가 높을수록 이미 공급(자리)이 많아 경쟁이 세다는 뜻이고, 낮을수록 자리가 부족할 수 있다는 뜻입니다. 다만 숫자가 높아도 이용률이 높고 대기가 있으면 다른 지역 수요가 들어오는 곳일 수 있어서, <b>이용률·대기와 함께</b> 보셔야 합니다.`]);
+  }
+  const ag = (R.sggs || []).filter((x) => x.aged != null && !x.me).sort((a, b) => b.aged - a.aged)[0];
+  if (S.pop && ag) {
+    QA.push([ag.aged > S.pop.aged ? `고령화율이 더 높은 지역(예: ${esc(ag.nm)} ${ag.aged}%)에 창업하는 게 더 유리한가요?` : "고령화율이 높은 지역에 창업하는 게 더 유리한가요?", `꼭 그렇지는 않습니다. 고령화율은 <b>전체 인구 중 65세 이상의 비율</b>이라, 비율이 높아도 어르신 수 자체는 적을 수 있고 이미 자리가 많을 수도 있습니다.<br>보고서 숫자로 비교하면 이렇습니다.<br>· ${esc(sg)}: 고령화율 ${S.pop.aged}%, 80세 이상 ${n(S.pop.p80)}명, 1,000명당 정원 ${S.capPer1k80 ?? "–"}명, 이용률 ${p(S.occ)}, 대기 ${n(S.wait)}명<br>· ${esc(ag.nm)}: 고령화율 ${ag.aged}%, 80세 이상 ${n(ag.p80)}명, 1,000명당 정원 ${ag.capPer1k80 ?? "–"}명, 이용률 ${p(ag.occ)}, 대기 ${n(ag.wait)}명<br>수요는 <b>어르신 수</b>(요양원은 80세 이상, 주야간보호는 75세 이상)와 <b>이미 있는 자리 수</b>를 함께 봐야 합니다. 어르신이 많고, 1,000명당 정원이 낮고, 이용률·대기가 높은 곳일수록 새 자리가 채워질 여지가 큽니다. 여기에 임대료, 인력 구하기, 신규 기관 이용률까지 함께 보시고 현장을 확인하신 뒤 판단하시길 권해 드립니다. 다른 지역은 <a href="/area/${R.region.sido}">무료 지역 현황</a>에서도 보실 수 있습니다.`]);
+  }
+  if (O.cw || O.food) {
+    const ex = O.cw ? `예를 들어 '요양보호사 1명당 ${who} 중간값 ${O.cw.med}명 (${O.cw.lo}~${O.cw.hi}명)'은, 이 지역 기관 ${n(O.cw.n)}곳을 이 숫자 순서로 줄 세웠을 때 한가운데 기관이 ${O.cw.med}명이라는 뜻입니다. 괄호 속 범위는 아래 10%와 위 10%를 뺀 구간이라, 대부분의 기관이 ${O.cw.lo}~${O.cw.hi}명 사이에 있습니다.` : `예를 들어 1식 식재료비 중간값 ${n(O.food.med)}원은, 신고한 기관 ${n(O.food.n)}곳을 금액 순으로 줄 세웠을 때 한가운데 기관의 금액입니다.`;
+    QA.push(["'중간값'은 무엇인가요? 평균과 뭐가 다른가요?", `중간값은 값을 작은 순서로 줄 세웠을 때 <b>한가운데에 있는 값</b>입니다. 평균은 아주 크거나 작은 값 하나에 크게 끌려가지만, 중간값은 그런 값에 덜 흔들려서 '보통 기관은 이 정도'를 보여 주기에 더 알맞습니다. 그래서 기관마다 차이가 큰 인력·비급여 숫자에 중간값을 씁니다.<br>${ex}`]);
+  }
+  if (S.occ != null) QA.push(["이용률·남는 자리·대기는 어떻게 계산하나요?", `이용률 = 현원 ÷ 정원입니다. ${esc(sg)}는 현원 ${n(S.now)}명 ÷ 정원 ${n(S.capacity)}명 = <b>${S.occ}%</b>입니다(현원을 신고하지 않은 기관은 뺌). 남는 자리 = 정원 − 현원 = 약 ${n(S.vacancy)}석, 대기 = 기관들이 공단에 신고한 대기 인원의 합 ${n(S.wait)}명입니다.<br>모두 기관이 공단에 신고한 값이라 실제와 다를 수 있고, 대기는 한 분이 여러 기관에 이름을 올려 겹쳐 세어질 수도 있습니다.`]);
+  if (pl) QA.push([`'손익분기 이용률 ${pl.be}%'는 무슨 뜻인가요?`, `매달 나가는 고정비(인건비·임대료·기타 운영비)를 매출로 겨우 메우는 이용률입니다. 정원 ${pl.cap}인 기준 고정비는 월 약 ${man(pl.fixed)}이고, ${who} 1명 월 매출은 약 ${man(pl.perUser.month)}이라, 약 ${Math.ceil(pl.cap * pl.be / 100)}명(${pl.be}%)을 채워야 본전입니다. 이보다 덜 차면 적자, 더 차면 흑자입니다.<br>${newO != null ? `이 지역 신규 기관 평균 이용률(${newO}%)과 비교해 보시면, 개원 초기에 이 선을 넘기기가 쉬운지 어려운지 가늠하실 수 있습니다. ` : ""}표준 가정으로 계산한 값이라, 실제 임대료·인건비를 넣으면 달라집니다.`]);
+  if (newO != null) QA.push(["'신규 기관 이용률'은 왜 중요한가요?", `최근 3년 안에 문을 열어 아직 공단 평가를 받지 않은 기관 ${n(R.newOcc.n)}곳의 이용률(${newO}%)입니다. 새로 여는 기관이 처음 몇 년 동안 어느 정도 채우는지 보여 주는, 창업하실 분께 가장 가까운 숫자입니다. 지역 평균(${p(S.occ)})보다 낮으면 처음 1~2년은 다 채우지 못한다고 보고 운영자금을 준비하셔야 합니다.`]);
+  QA.push(["기관평가 등급(A~E)은 무엇인가요?", "국민건강보험공단이 서비스 종류별로 약 3년마다 하는 평가로, A(최우수)·B(우수)·C(양호)·D(보통)·E(미흡)로 나뉩니다. 새로 연 기관은 아직 평가를 받지 않아 등급이 없습니다. 보호자들이 기관을 고를 때 많이 보는 숫자라, 대기가 A등급 기관에 몰리는 지역이 많습니다. 어르신의 장기요양등급(1~5등급)과는 다른 것입니다."]);
+  QA.push(["보고서 숫자가 실제와 다른 것 같아요.", "정원·현원·대기·인력·비급여는 기관이 국민건강보험공단에 신고한 값을 그대로 쓴 것이라, 신고 시점에 따라 실제와 다를 수 있습니다. 계산이나 처리에 오류가 있어 보이면 신청번호와 함께 031-818-6336 또는 moongoldenj@naver.com으로 알려 주세요. 확인해서 바로잡은 보고서로 다시 발행해 드립니다."]);
+  const sugg = [`${sg}에 정원 30인 ${R.kind_nm}을 열면 몇 명을 채워야 본전인가요?`, "이 지역의 가장 큰 위험 요인은 무엇인가요?", "핵심 요약을 더 쉽게 설명해 주세요", `비교 지역과 비교하면 ${sg}의 장단점은 무엇인가요?`];
+  let h = `<h2>보고서 풀이 · AI에게 묻기 (무료)</h2><p class="muted">보고서를 읽으시다 궁금한 점을 정리했습니다. 더 궁금하신 것은 아래 칸에 적어 주시면, AI가 <b>이 보고서의 숫자를 바탕으로</b> 설명해 드립니다.</p>`;
+  h += `<h3>자주 묻는 질문</h3>` + QA.map(([q, a]) => `<details><summary>${q}</summary><p>${a}</p><button class="more" data-q="${esc(q.replace(/<[^>]+>/g, ""))}">이 내용 AI에게 더 묻기 ›</button></details>`).join("");
+  h += `<h3>AI에게 묻기</h3><div class="chips">${sugg.map((q) => `<button data-q="${esc(q)}">${esc(q)}</button>`).join("")}</div>
+    <div class="chatlog" id="log"></div>
+    <div class="askrow"><textarea id="q" maxlength="500" placeholder="예: 이 지역에 요양원을 열면 처음 1년은 어떻게 될까요?"></textarea><button id="send">묻기</button></div>
+    <p class="muted small" id="left">보고서 1개당 하루 30번까지 무료입니다. AI 답변은 참고용이며, 창업·투자 결정은 현장 확인과 전문가 상담과 함께 하시길 권해 드립니다. 질문 내용은 저장하지 않습니다.</p>`;
+  $("#ask").innerHTML = h; $("#ask").hidden = false;
+  const msgs = [];
+  const add = (role, text) => { const d = document.createElement("div"); d.className = "bub " + (role === "user" ? "me" : "ai"); d.textContent = text; $("#log").append(d); d.scrollIntoView({ block: "nearest" }); return d; };
+  let busy = false;
+  async function ask(q) {
+    q = String(q || "").trim(); if (!q || busy) return;
+    busy = true; $("#send").disabled = true; $("#q").value = "";
+    add("user", q); msgs.push({ role: "user", content: q });
+    const w = add("ai", "답변을 준비하고 있습니다…");
+    try {
+      const r = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope: "report", t, messages: msgs.slice(-10) }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.오류 || "잠시 후 다시 시도해 주세요.");
+      w.textContent = j.reply; msgs.push({ role: "assistant", content: j.reply });
+      if (j.left != null) $("#left").textContent = `오늘 남은 무료 질문 ${j.left}번 · AI 답변은 참고용이며, 창업·투자 결정은 현장 확인과 전문가 상담과 함께 하시길 권해 드립니다. 질문 내용은 저장하지 않습니다.`;
+    } catch (e) { w.textContent = e.message; msgs.pop(); }
+    busy = false; $("#send").disabled = false;
+  }
+  $("#send").onclick = () => ask($("#q").value);
+  $("#q").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); ask($("#q").value); } });
+  $("#ask").addEventListener("click", (e) => { const b = e.target.closest("button[data-q]"); if (!b) return; if (b.classList.contains("more")) { $("#q").value = b.dataset.q + " 좀 더 쉽게, 이 보고서 숫자로 설명해 주세요."; $("#q").focus(); } else ask(b.dataset.q); });
+}
 const ps = (w, a, b) => { const c = String(w).charCodeAt(String(w).length - 1) - 0xac00; return c >= 0 && c <= 11171 && c % 28 ? a : b; };
 const jo = (w, a, b) => { const c = String(w).charCodeAt(String(w).length - 1) - 0xac00; return w + (c >= 0 && c <= 11171 && c % 28 ? a : b); };
 (async () => {
@@ -343,7 +408,7 @@ const jo = (w, a, b) => { const c = String(w).charCodeAt(String(w).length - 1) -
     const r = await fetch("/api/order?report=1&t=" + encodeURIComponent(t));
     const j = await r.json();
     if (!r.ok) throw new Error(j.오류 || "보고서를 불러오지 못했습니다");
-    render(j);
+    render(j); try { renderAsk(j); } catch (e) { console.log(e); }
   } catch (e) { $("#msg").innerHTML = `${esc(e.message)}<br><a href="/order?t=${encodeURIComponent(t)}">신청 확인 페이지로</a>`; }
 })();
 </script>
