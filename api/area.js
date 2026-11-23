@@ -82,7 +82,7 @@ function page({ title, desc, canonical, crumbs, body }) {
 <header><div class="wrap"><a href="/">케어온길</a></div></header>
 <main class="wrap"><nav class="crumb">${crumbs.map((c, i) => (i < crumbs.length - 1 ? `<a href="${c.href}">${esc(c.nm)}</a>` : esc(c.nm))).join(" › ")}</nav>${body}</main>
 <footer><div class="wrap"><p>자료: 국민건강보험공단 장기요양기관 정보(공공데이터포털), 행정안전부 주민등록 인구. 정원·현원·대기는 기관이 공단에 신고한 값이라 실제와 다를 수 있으니 기관에 확인해 보시길 권해 드립니다. 케어온길은 기관을 소개·추천·알선하지 않습니다.</p>
-<p><a href="/">케어온길 (보호자용)</a> · <a href="/biz">케어온길 비즈 (운영·창업)</a> · <a href="/area">지역별 현황</a> · <a href="/privacy">개인정보처리방침</a> · <a href="/terms">이용약관</a></p>
+<p><a href="/">케어온길 (보호자용)</a> · <a href="/biz">케어온길 비즈 (운영·창업)</a> · <a href="/area">지역별 현황</a> · <a href="/grade">등급 신청 방법</a> · <a href="/privacy">개인정보처리방침</a> · <a href="/terms">이용약관</a></p>
 <p>주식회사 벤투런 · 대표 문창조 · 사업자등록번호 588-86-02083 · 031-818-6336</p></div></footer></body></html>`;
 }
 
@@ -186,8 +186,8 @@ export default async function handler(req, res) {
 <div class="panel"><h2>${esc(short)}의 다른 장기요양 서비스</h2><div class="chips">${otherKinds}</div></div>
 <div class="panel"><h2>${esc(S.nm)}의 다른 지역 ${K}</h2><div class="chips">${near}</div></div>
 <div class="panel"><h2>${K} 이용 전에 알아 두실 점</h2><ul>
-<li>장기요양 급여는 <b>장기요양등급</b>을 받은 어르신이 이용하실 수 있습니다. 등급 신청은 국민건강보험공단(1577-1000)에 하시면 됩니다.</li>
-<li>본인부담금은 보통 급여비용의 ${kind === "home" || kind === "short" ? "20%" : "15%"}이며, 기초생활수급자는 면제, 감경 대상자는 줄어듭니다. 식재료비·상급침실료 같은 비급여는 따로 냅니다.</li>
+<li>장기요양 급여는 <b>장기요양등급</b>을 받은 어르신이 이용하실 수 있습니다. 등급 신청은 국민건강보험공단(1577-1000)에 하시면 됩니다. <a href="/grade">등급 신청 방법 자세히</a></li>
+<li>본인부담금은 보통 급여비용의 ${kind === "home" ? "20%" : "15%"}이며, 기초생활수급자는 면제, 감경 대상자는 줄어듭니다. 식재료비·상급침실료 같은 비급여는 따로 냅니다.</li>
 <li>장기요양 본인부담금은 연말정산 의료비 세액공제 대상이 될 수 있습니다. <a href="/#guide">자세히 보기</a></li>
 <li>정원·현원·대기는 기관이 공단에 신고한 값이라 실제와 다를 수 있습니다. 방문 전에 전화로 확인해 보세요.</li></ul></div>`;
     const title = `${region} ${K} ${num(local.n)}곳 — ${stay ? "정원·빈자리·" : ""}기관평가 | 케어온길`;
