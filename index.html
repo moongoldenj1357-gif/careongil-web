@@ -166,6 +166,8 @@ footer p{margin:4px 0}
 #nav .side{margin-left:auto;display:flex;flex-direction:column;gap:6px}
 #nav .side a{justify-content:center}
 #nav{align-items:flex-start}
+.staffbox{background:var(--main-soft);border-radius:12px;padding:12px 14px;margin:6px 0 10px}.staffbox .sbig{font-size:1.05rem;line-height:1.7}.staffbox .sbig b{font-size:1.25rem;color:var(--main)}.staffbox .b{display:inline-block;white-space:nowrap;background:#fff}
+.b.ok{background:#e3f4e8;color:#1f7a3d}.b.warn{background:#fdf0dc;color:#9a5b00}
 .callbox{border:1px solid var(--line,#e5e0d8);border-radius:12px;padding:12px 14px;margin-top:14px}
 .callbox h4{margin:0 0 6px;font-size:1rem}.callbox ol{margin:6px 0;padding-left:20px}.callbox li{margin:3px 0}
 .callbox .sub{font-weight:700;margin:10px 0 2px;font-size:.92rem}
@@ -551,6 +553,41 @@ function evalHtml(r) {
     ${ev.length > 1 ? `<p class="muted">지난 평가: ${ev.slice(1).map((x) => `${esc(x.round)} <b>${x.grade}</b>`).join(" · ")}</p>` : ""}
     <p class="muted">기관의 서비스 수준을 공단이 3년마다 평가한 결과입니다(A 최우수 ~ E 미흡). 어르신의 '장기요양 1~5등급'과는 다릅니다. ${more}</p>`;
 }
+// 돌봄 인력: 요양보호사 1명당 어르신 수 + 같은 시·도 비교 + 직종별 인원
+const STAFF_GROUPS = [
+  ["간호", ["간호사", "간호조무사"]],
+  ["재활", ["물리치료사", "작업치료사"]],
+  ["상담·관리", ["시설장", "사회복지사", "사무국장", "사무원"]],
+  ["식사·위생", ["영양사", "조리원", "위생원"]],
+  ["그 밖에", ["의사", "관리인", "보조원", "기타"]],
+];
+function staffHtml(r) {
+  const st = r.staff;
+  if (!st || !Object.values(st).some((v) => v)) return `<h4 class="sec">돌봄 인력</h4><p class="muted">신고된 인력 정보가 없습니다.</p>`;
+  const kindNm = { home: "요양원", daycare: "주야간보호", short: "단기보호" }[r.kind] || "";
+  const sidoNm = (regions.find((x) => x.cd === r.sido_cd) || {}).nm || "같은 시·도";
+  const who = r.kind === "daycare" ? "이용자" : "어르신";
+  let head = "";
+  if (r.cw_per != null) {
+    const p = r.peer;
+    let tag = "", cmp = "";
+    if (p) {
+      tag = r.cw_per <= p.p25 ? `<span class="b ok">지역에서 일손이 넉넉한 편</span>` : r.cw_per >= p.p75 ? `<span class="b warn">지역 평균보다 1명이 맡는 ${who}이 많은 편</span>` : `<span class="b">지역 평균 수준</span>`;
+      cmp = `${esc(sidoNm)} ${p.same && r.sub_nm ? esc(r.sub_nm) : kindNm} ${num(p.n)}곳의 중간값은 <b>${p.med}명</b>입니다(가운데 절반이 ${p.p25}~${p.p75}명).`;
+    }
+    const law = r.kind === "daycare" ? `주야간보호는 이용자 7명당 요양보호사 1명 이상을 두도록 정해져 있습니다.`
+      : r.kind === "home" && !r.sub_nm ? `요양원은 어르신 2.3명당 요양보호사 1명 이상이 기준이며, 2.1명으로 강화되는 중입니다.` : "";
+    head = `<div class="staffbox"><div class="sbig">요양보호사 1명당 ${who} <b>${r.cw_per}명</b> ${tag}</div>
+      <p class="muted" style="margin:6px 0 0">${r.now > 0 ? "현원" : "정원"} ${num(r.now > 0 ? r.now : r.capacity)}명 ÷ 요양보호사 ${num(st.요양보호사)}명. 숫자가 작을수록 한 사람이 맡는 ${who}이 적습니다. ${cmp} ${law}</p></div>`;
+  }
+  const rows = [["직접 돌봄", ["요양보호사", "요양보호사유예"]], ...STAFF_GROUPS]
+    .map(([g, ks]) => [g, ks.filter((k) => st[k]).map((k) => `${esc(k === "요양보호사유예" ? "요양보호사(자격 유예)" : k)} <b>${st[k]}</b>`)])
+    .filter(([g, a]) => a.length || g === "간호");
+  const nurse = (st.간호사 || 0) + (st.간호조무사 || 0);
+  return `<h4 class="sec">돌봄 인력</h4>${head}
+    <table class="kv">${rows.map(([g, a]) => `<tr><th>${g}</th><td>${a.length ? a.join(" · ") : `<span class="muted">신고 없음</span>`}</td></tr>`).join("")}</table>
+    <p class="muted">공단에 신고된 직원 수입니다. 요양보호사는 낮·밤 교대로 일하므로 한 시간대에 함께 있는 인원은 이보다 적습니다.${!nurse && r.kind !== "daycare" ? " 간호 인력이 신고되어 있지 않으니, 콧줄·욕창 등 의료적 돌봄이 필요하시면 꼭 확인해 보세요." : ""} 의사는 대부분 정기적으로 방문하는 촉탁의라 0명으로 나올 수 있습니다.</p>`;
+}
 function extraHtml(r) {
   if (!STAY.has(r.kind)) return "";
   if (!r.extra_at) return `<p class="muted" style="margin-top:14px">비용·인력·시설 정보는 수집 중입니다. 며칠 안에 채워질 예정입니다.</p>`;
@@ -561,8 +598,7 @@ function extraHtml(r) {
     ${np.length ? `<table class="kv">${np.map((x) => `<tr><th>${esc(x.종류)}</th><td><b>${won(x.금액)}</b>${x.근거 ? ` <span class="muted">(${esc(x.근거)})</span>` : ""}${x.등록일 ? `<br><span class="muted">신고일 ${esc(x.등록일)}</span>` : ""}</td></tr>`).join("")}</table>
       <p class="muted">기관이 공단에 신고한 금액입니다. 식재료비는 보통 1식(한 끼) 금액이고, 하루 몇 끼인지는 괄호 안의 산출근거에서 보실 수 있습니다. 상급침실사용료는 하루 금액이며, 여러 개일 때 어느 방(1인실·2인실 등)의 금액인지는 시설에 확인해 주세요.</p>`
       : `<p class="muted">신고된 비급여 항목이 없습니다.</p>`}
-    <h4 class="sec">일하는 사람</h4>
-    <p>${nz(r.staff).map(([k, v]) => `${esc(k)} <b>${v}</b>`).join(" · ") || "–"}</p>
+    ${staffHtml(r)}
     <h4 class="sec">방과 시설</h4>
     <p>${nz(r.rooms).map(([k, v]) => `${esc(k)} <b>${v}</b>`).join(" · ") || "–"}</p>
     ${pg.length ? `<h4 class="sec">프로그램 (${pg.length})</h4>
@@ -733,6 +769,7 @@ $("#trayGo").addEventListener("click", async () => {
       ${line("식재료비", (r) => (r.food ? `1식 ${won(r.food.금액)}<br><span class="muted">${esc(r.food.근거 || "")}</span>` : r.extra_at ? "신고 없음" : "수집 중"))}
       ${line("기타 비급여", (r) => (Array.isArray(r.nonpay) ? r.nonpay.filter((x) => x.종류 !== "식재료비").map((x) => `${esc(x.종류)} ${won(x.금액)}`).join("<br>") || "–" : "수집 중"))}
       ${line("요양보호사", (r) => (r.care_workers != null ? `${r.care_workers}명` : "–"))}
+      ${line("요양보호사 1명당", (r) => (r.cw_per != null ? `${r.kind === "daycare" ? "이용자" : "어르신"} ${r.cw_per}명` : "–"))}
       ${line("간호(조무)사", (r) => (r.nurses != null ? `${r.nurses}명` : "–"))}
       ${line("침실", (r) => esc(r.beds || "–"))}
       ${line("프로그램", (r) => (Array.isArray(r.programs) ? `${r.programs.length}개` : "–"))}
