@@ -106,7 +106,8 @@ async function facts(ids) {
   return rows.map((r) => {
     const now = (r.now_m ?? 0) + (r.now_f ?? 0), wait = (r.wait_m ?? 0) + (r.wait_f ?? 0);
     const np = Array.isArray(r.nonpay) && r.nonpay.length ? r.nonpay.map((x) => `${x.종류} ${x.금액 ?? "?"}원(${x.근거 || ""})`).join(", ") : "신고 정보 없음/수집 전";
-    const st = r.staff ? `요양보호사 ${r.staff.요양보호사 ?? "?"}명, 간호사 ${r.staff.간호사 ?? 0}명, 간호조무사 ${r.staff.간호조무사 ?? 0}명` : "수집 전";
+    const base = now > 0 ? now : r.capacity, cw = r.staff?.요양보호사 || 0;
+    const st = r.staff ? `요양보호사 ${r.staff.요양보호사 ?? "?"}명${cw && base ? `(1명당 이용자 약 ${Math.round((base / cw) * 10) / 10}명, 신고 인원 기준·교대 근무라 실제 동시 인원은 더 적음)` : ""}, 간호사 ${r.staff.간호사 ?? 0}명, 간호조무사 ${r.staff.간호조무사 ?? 0}명, 물리·작업치료사 ${(r.staff.물리치료사 || 0) + (r.staff.작업치료사 || 0)}명, 사회복지사 ${r.staff.사회복지사 ?? 0}명` : "수집 전";
     return `- ${r.name} (${KIND_NM[r.kind] || r.kind}) | ${r.addr || "주소 수집 전"} | 전화 ${r.tel || "-"} | 정원 ${r.capacity ?? "-"}, 현원 ${r.capacity != null ? now : "-"}, 대기 ${r.capacity != null ? wait : "-"} | 지정일 ${r.designated || "-"} | 기관평가 ${r.eval_grade ? `${r.eval_grade}(${r.eval_year})` : "결과 없음"} | 인력: ${st} | 비급여: ${np}`;
   }).join("\n");
 }

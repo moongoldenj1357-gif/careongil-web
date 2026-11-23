@@ -39,10 +39,13 @@ const sum = (a, b) => (a == null && b == null ? null : (a || 0) + (b || 0));
 function shape(r) {
   const now = sum(r.now_m, r.now_f), wait = sum(r.wait_m, r.wait_f);
   const st = r.staff || null, rm = r.rooms || null;
+  const cwN = st?.요양보호사 || 0, base = now > 0 ? now : r.capacity;
   return { ...r, homepage: site(r.homepage), id: `${r.sym}:${r.pttn}`, kind_nm: KIND_NM[r.kind] || "기타", sub_nm: sub(r.pttn), now, wait,
     vacancy: r.capacity != null && now != null ? Math.max(0, r.capacity - now) : null, has_detail: !!r.detail_at,
     // 비교표용 요약
-    ...(st ? { care_workers: st.요양보호사 ?? null, nurses: (st.간호사 || 0) + (st.간호조무사 || 0) } : {}),
+    ...(st ? { care_workers: st.요양보호사 ?? null, nurses: (st.간호사 || 0) + (st.간호조무사 || 0),
+      // 요양보호사 1명당 어르신 수 (현원 기준, 현원이 0이면 정원 기준)
+      cw_per: cwN > 0 && base > 0 ? Math.round((base / cwN) * 10) / 10 : null } : {}),
     ...(rm ? { beds: ["1인실", "2인실", "3인실", "4인실"].map((k) => `${k} ${rm[k] || 0}`).join(" · ") } : {}),
     ...(Array.isArray(r.nonpay) ? { food: r.nonpay.find((x) => x.종류 === "식재료비") || null } : {}) };
 }
@@ -63,6 +66,24 @@ async function addUnits(rows) {
     if (n) r.dementia_units = n;
   }
   return rows;
+}
+// 같은 시·도, 같은 종류 기관들의 "요양보호사 1명당 어르신 수" 분포 (상세 화면 비교용)
+//  공동생활가정(A04·S41)처럼 유형이 다르면 같은 유형끼리, 10곳이 안 되면 종류 전체로 비교
+async function peerStaff(r) {
+  const all = [];
+  for (let off = 0; off < 5000; off += 1000) {
+    const { data } = await sb(`ltc_insts?select=pttn,capacity,now_m,now_f,cw:staff->${encodeURIComponent("요양보호사")}&sido_cd=eq.${r.sido_cd}&kind=eq.${r.kind}&staff=not.is.null&order=sym.asc,pttn.asc&limit=1000&offset=${off}`);
+    all.push(...data);
+    if (data.length < 1000) break;
+  }
+  const per = (x) => { const now = sum(x.now_m, x.now_f), b = now > 0 ? now : x.capacity, c = Number(x.cw) || 0; return c > 0 && b > 0 ? b / c : null; };
+  let list = all.filter((x) => x.pttn === r.pttn).map(per).filter((v) => v != null);
+  const same = list.length >= 10;
+  if (!same) list = all.map(per).filter((v) => v != null);
+  if (list.length < 10) return null;
+  list.sort((a, b) => a - b);
+  const q = (p) => { const i = (list.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i); return Math.round((list[lo] + (list[hi] - list[lo]) * (i - lo)) * 10) / 10; };
+  return { n: list.length, same, p25: q(0.25), med: q(0.5), p75: q(0.75) };
 }
 const ID = /^(\d{5,15}):([A-Z]\d{2})$/;
 const parseId = (s) => { const m = String(s || "").trim().toUpperCase().match(ID); return m ? { sym: m[1], pttn: m[2] } : null; };
@@ -211,8 +232,10 @@ export default async function handler(req, res) {
         if (!rows[0]) return res.status(404).json({ 오류: "기관을 찾지 못했습니다" });
         // 평가 이력 (국민건강보험공단 정기·수시평가)
         const r = rows[0];
-        const { data: ev } = await sb(`ltc_evals?select=round,etype,eval_date,grade,score,size,areas&sym=eq.${r.sym}&kind=eq.${r.kind}&order=eval_date.desc`).catch(() => ({ data: [] }));
-        return res.status(200).json({ ...r, evals: ev });
+        const [{ data: ev }, peer] = await Promise.all([
+          sb(`ltc_evals?select=round,etype,eval_date,grade,score,size,areas&sym=eq.${r.sym}&kind=eq.${r.kind}&order=eval_date.desc`).catch(() => ({ data: [] })),
+          r.cw_per != null ? peerStaff(r).catch(() => null) : null]);
+        return res.status(200).json({ ...r, evals: ev, peer });
       }
       return res.status(200).json({ rows });
     }
