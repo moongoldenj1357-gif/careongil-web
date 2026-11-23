@@ -1,4 +1,24 @@
 {
-  "regions": ["icn1"],
-  "cleanUrls": true
+  "regions": [
+    "icn1"
+  ],
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/area",
+      "destination": "/api/area"
+    },
+    {
+      "source": "/area/:sido",
+      "destination": "/api/area?sido=:sido"
+    },
+    {
+      "source": "/area/:sido/:sgg/:kind",
+      "destination": "/api/area?sido=:sido&sgg=:sgg&kind=:kind"
+    },
+    {
+      "source": "/sitemap-area.xml",
+      "destination": "/api/sitemap-area"
+    }
+  ]
 }

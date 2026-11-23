@@ -6,3 +6,4 @@ Disallow: /report
 Disallow: /api/
 
 Sitemap: https://www.careongil.kr/sitemap.xml
+Sitemap: https://www.careongil.kr/sitemap-area.xml
