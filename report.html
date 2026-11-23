@@ -52,7 +52,7 @@ tr.me td{background:#fff7e0;font-weight:700}
 .ask details{border-bottom:1px solid var(--line);padding:10px 0}.ask summary{cursor:pointer;font-weight:600}
 .ask details p{margin:8px 0 4px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.chips button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 11px;font:inherit;font-size:.85rem;cursor:pointer}
-.chatlog{display:flex;flex-direction:column;gap:8px;margin:12px 0;max-height:520px;overflow:auto}
+.chatlog{display:flex;flex-direction:column;gap:8px;margin:12px 0}
 .bub{padding:10px 12px;border-radius:12px;white-space:pre-wrap;font-size:.92rem;max-width:92%}
 .bub.me{align-self:flex-end;background:var(--main);color:#fff}.bub.ai{align-self:flex-start;background:#f3efe6}
 .askrow{display:flex;gap:8px}.askrow textarea{flex:1;border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit;min-height:48px;resize:vertical}
@@ -381,6 +381,8 @@ function renderAsk(R) {
     <p class="muted small" id="left">보고서 1개당 하루 30번까지 무료입니다. AI 답변은 참고용이며, 창업·투자 결정은 현장 확인과 전문가 상담과 함께 하시길 권해 드립니다. 질문 내용은 저장하지 않습니다.</p>`;
   $("#ask").innerHTML = h; $("#ask").hidden = false;
   const msgs = [];
+  // AI 답의 **굵게**는 굵은 글씨로, 줄머리 "- "는 "· "로 (그 밖의 마크다운 기호는 지움)
+  const fmt = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/^#+\s*/gm, "").replace(/^\s*[-*]\s+/gm, "· ").replace(/\*\*/g, "");
   const add = (role, text) => { const d = document.createElement("div"); d.className = "bub " + (role === "user" ? "me" : "ai"); d.textContent = text; $("#log").append(d); d.scrollIntoView({ block: "nearest" }); return d; };
   let busy = false;
   async function ask(q) {
@@ -392,7 +394,7 @@ function renderAsk(R) {
       const r = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope: "report", t, messages: msgs.slice(-10) }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.오류 || "잠시 후 다시 시도해 주세요.");
-      w.textContent = j.reply; msgs.push({ role: "assistant", content: j.reply });
+      w.innerHTML = fmt(j.reply); w.scrollIntoView({ block: "start", behavior: "smooth" }); msgs.push({ role: "assistant", content: j.reply });
       if (j.left != null) $("#left").textContent = `오늘 남은 무료 질문 ${j.left}번 · AI 답변은 참고용이며, 창업·투자 결정은 현장 확인과 전문가 상담과 함께 하시길 권해 드립니다. 질문 내용은 저장하지 않습니다.`;
     } catch (e) { w.textContent = e.message; msgs.pop(); }
     busy = false; $("#send").disabled = false;
