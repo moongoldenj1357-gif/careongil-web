@@ -5,7 +5,7 @@
 //  → { reply, left }   (left = 오늘 남은 횟수)
 //  하루 한도: 1인(IP 기준, 해시로만 보관) CHAT_USER_DAILY(기본 10) · 사이트 전체 CHAT_SITE_DAILY(기본 300)
 import { createHash } from "node:crypto";
-export const config = { maxDuration: 30 };
+export const config = { maxDuration: 60 };
 const SB_URL = (process.env.SUPABASE_URL ?? "").trim().replace(/\/+$/, "").replace(/\/rest\/v1$/, "");
 const SB_KEY = process.env.SUPABASE_SECRET_KEY ?? "";
 const H = (x = {}) => ({ apikey: SB_KEY, "Content-Type": "application/json", ...(SB_KEY.startsWith("sb_") ? {} : { Authorization: `Bearer ${SB_KEY}` }), ...x });
@@ -200,16 +200,22 @@ export default async function handler(req, res) {
       const f = await facts(body?.ctx).catch(() => "");
       system = SYSTEM + (f ? `\n\n[기관 자료] 사용자가 지금 보고 있는 기관입니다. 국민건강보험공단 공개 자료 기준이며 실제와 다를 수 있습니다.\n${f}` : "");
     }
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-      body: JSON.stringify({ model: MODEL, max_tokens: 2000, system, messages: msgs }),
-      signal: AbortSignal.timeout(25000),
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j?.error?.message || `AI 응답 오류 ${r.status}`);
-    const reply = (j.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n").trim();
-    return res.status(200).json({ reply: reply || "답변을 만들지 못했습니다. 질문을 조금 바꿔서 다시 물어봐 주시면 감사하겠습니다.", left: take.left });
+    // 생각(추론)에 토큰을 다 써서 글이 비면, 한 번 더 "바로 짧게" 요청함
+    const call = async (sys, maxTok) => {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+        body: JSON.stringify({ model: MODEL, max_tokens: maxTok, system: sys, messages: msgs }),
+        signal: AbortSignal.timeout(isReport ? 40000 : 25000),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j?.error?.message || `AI 응답 오류 ${r.status}`);
+      return { text: (j.content || []).filter((c) => c.type === "text").map((c) => c.text).join("\n").trim(), stop: j.stop_reason };
+    };
+    let out = await call(system, isReport ? 6000 : 2000);
+    if (!out.text) out = await call(system + "\n\n[중요] 길게 생각하지 말고, 지금 바로 8줄 안으로 짧게 답하세요.", 4000).catch(() => out);
+    const reply = out.text;
+    return res.status(200).json({ reply: reply || "답변을 만들지 못했습니다. 질문을 조금 바꿔서 다시 물어봐 주시면 감사하겠습니다.", left: take.left, ...(reply ? {} : { 상세: out.stop || null }) });
   } catch (e) {
     return res.status(500).json({ 오류: "잠시 후 다시 시도해 주시기 바랍니다.", 상세: String(e.message).slice(0, 120) });
   }
