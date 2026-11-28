@@ -631,12 +631,12 @@ function staffHtml(r) {
 function extraHtml(r) {
   if (!STAY.has(r.kind)) return "";
   if (!r.extra_at) return `<p class="muted" style="margin-top:14px">비용·인력·시설 정보는 수집 중입니다. 며칠 안에 채워질 예정입니다.</p>`;
-  const np = Array.isArray(r.nonpay) ? r.nonpay : [];
+  const np = npRows(r);
   const pg = Array.isArray(r.programs) ? r.programs : [];
   return `${costBox(r)}
     <h4 class="sec">본인이 따로 내는 비용 (비급여)</h4>
     ${np.length ? `<table class="kv">${np.map((x) => `<tr><th>${esc(x.종류)}</th><td><b>${won(x.금액)}</b>${x.근거 ? ` <span class="muted">(${esc(String(x.근거).replace(/^\((.*)\)$/, "$1"))})</span>` : ""}${x.등록일 ? `<br><span class="muted">신고일 ${esc(x.등록일)}</span>` : ""}</td></tr>`).join("")}</table>
-      <p class="muted">기관이 공단에 신고한 금액입니다. 식재료비는 보통 1식(한 끼) 금액이고, 하루 몇 끼인지는 괄호 안의 산출근거에서 보실 수 있습니다. 상급침실사용료는 하루 금액이며, 여러 개일 때 어느 방(1인실·2인실 등)의 금액인지는 시설에 확인해 주세요.</p>`
+      <p class="muted">기관이 공단에 신고한 금액입니다. 식재료비는 보통 1식(한 끼) 금액이고, 하루 몇 끼인지는 괄호 안의 산출근거에서 보실 수 있습니다. 식재료비가 여러 줄이면 일반식·경관식(콧줄)·간식처럼 어르신에 따라 다른 금액인 경우가 많아, 예상 비용은 하루 3끼 기준 금액으로 계산했습니다. 상급침실사용료는 하루 금액이며, 여러 개일 때 어느 방(1인실·2인실 등)의 금액인지는 시설에 확인해 주세요.</p>`
       : `<p class="muted">신고된 비급여 항목이 없습니다.</p>`}
     ${staffHtml(r)}
     <h4 class="sec">방과 시설</h4>
@@ -915,13 +915,16 @@ fillGrades(); calc();
 // 기관 상세 → 계산기 (입소형이면 식재료비를 넣어 줌)
 // 공단에 신고된 식재료비 금액은 '1식' 기준입니다(산출근거 예: "1식 4000원 X 3식/일").
 // 하루 금액 = 1식 금액 × 하루 끼니 수(근거에서 읽고, 없으면 요양원 3끼·주야간 1끼로 봄)
+// 식재료비가 여러 줄(일반식·경관식 등)로 신고된 기관이 많음 → 0원은 빼고, 하루 끼니 수가 기본값(요양원 3끼)과 같은 줄을 먼저 씀
 function foodPerDay(r, defMeals) {
-  const f = (r.nonpay || []).find((x) => x.종류 === "식재료비");
-  if (!f || !f.금액 || f.금액 > 30000) return null;
-  const m = String(f.근거 || "").replace(/\s/g, "").match(/[xX×*](\d)식/);
-  const n = m ? +m[1] : defMeals;
-  return n >= 1 && n <= 5 ? f.금액 * n : f.금액 * defMeals;
+  const meals = (f) => { const m = String(f.근거 || "").replace(/\s/g, "").match(/[xX×*](\d)식/); const n = m ? +m[1] : defMeals; return n >= 1 && n <= 5 ? n : defMeals; };
+  const c = (r.nonpay || []).filter((x) => x.종류 === "식재료비" && +x.금액 > 0 && +x.금액 <= 30000);
+  if (!c.length) return null;
+  const f = c.find((x) => meals(x) === defMeals) || c[0];
+  return +f.금액 * meals(f);
 }
+// 똑같은 줄이 두 번 신고된 경우 한 번만 보여 줌
+const npRows = (r) => { const seen = new Set(); return (Array.isArray(r.nonpay) ? r.nonpay : []).filter((x) => { const k = [x.종류, x.금액, x.근거].join("|"); if (seen.has(k)) return false; seen.add(k); return true; }); };
 function toCalc(r, g, rt) {
   const stay = r.kind === "home";
   $(`#cMode [data-m="${stay ? "stay" : "home"}"]`).click();
