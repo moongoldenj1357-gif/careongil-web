@@ -84,7 +84,7 @@ ${robots ? `<meta name="robots" content="${robots}">` : ""}<link rel="icon" href
 <header><div class="wrap"><a href="/">케어온길</a></div></header>
 <main class="wrap"><nav class="crumb">${crumbs.map((c, i) => (i < crumbs.length - 1 ? `<a href="${c.href}">${esc(c.nm)}</a>` : esc(c.nm))).join(" › ")}</nav>${body}</main>
 <footer><div class="wrap"><p>자료: 국민건강보험공단 장기요양기관 정보(공공데이터포털), 행정안전부 주민등록 인구. 정원·현원·대기는 기관이 공단에 신고한 값이라 실제와 다를 수 있으니 기관에 확인해 보시길 권해 드립니다. 케어온길은 기관을 소개·추천·알선하지 않습니다.</p>
-<p><a href="/">케어온길 (보호자용)</a> · <a href="/biz">케어온길 비즈 (운영·창업)</a> · <a href="/area">지역별 현황</a> · <a href="/grade">등급 신청 방법</a> · <a href="/privacy">개인정보처리방침</a> · <a href="/terms">이용약관</a></p>
+<p><a href="/">케어온길 (보호자용)</a> · <a href="/biz">케어온길 비즈 (운영·창업)</a> · <a href="/area">지역별 현황</a> · <a href="/grade">등급 신청 방법</a> · <a href="/tool">복지용구</a> · <a href="/privacy">개인정보처리방침</a> · <a href="/terms">이용약관</a></p>
 <p>주식회사 벤투런 · 대표 문창조 · 사업자등록번호 588-86-02083 · 031-818-6336</p></div></footer></body></html>`;
 }
 

@@ -61,7 +61,8 @@ export default async function handler(req, res) {
       if (d.calls >= DAILY_DETAIL) return res.status(200).json({ 상세: "오늘 한도까지 했어요", ...d });
       const old = new Date(Date.now() - 30 * 864e5).toISOString();
       let worked = 0;
-      for (const kind of PRIORITY) {
+      // 복지용구 사업소(tool)는 주소·전화만 받으면 되므로 맨 뒤에
+      for (const kind of [...PRIORITY, "tool"]) {
         while (left() > 10000 && d.calls < DAILY_DETAIL) {
           // 입소형은 인력·시설·비급여(extra_at)가 아직 없는 곳도 다시 받음
           const need = STAY.includes(kind) ? `or=(detail_at.is.null,detail_at.lt.${old},extra_at.is.null)` : `or=(detail_at.is.null,detail_at.lt.${old})`;

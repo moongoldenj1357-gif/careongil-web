@@ -2,6 +2,7 @@
 //  기관이 1곳 이상 있는 시·군·구 × 기관 종류만 넣음. 하루 캐시.
 import { SB_URL, SB_KEY } from "../lib/db.js";
 import { regionNames, kindCounts } from "./area.js";
+import { toolCounts } from "./tool.js";
 
 export const config = { maxDuration: 60 };
 const SITE = "https://www.careongil.kr";
@@ -9,7 +10,7 @@ const SITE = "https://www.careongil.kr";
 export default async function handler(req, res) {
   if (!SB_URL || !SB_KEY) return res.status(500).send("설정 전");
   try {
-    const [regions, cnt] = await Promise.all([regionNames(), kindCounts(null)]);
+    const [regions, cnt, tcnt] = await Promise.all([regionNames(), kindCounts(null), toolCounts(null).catch(() => new Map())]);
     const today = new Date().toISOString().slice(0, 10);
     const urls = [`${SITE}/area`];
     for (const s of regions) {
@@ -18,6 +19,14 @@ export default async function handler(req, res) {
         const c = cnt.get(`${s.cd}-${g.cd}`) || {};
         for (const k of Object.keys(c)) if (c[k] > 0) urls.push(`${SITE}/area/${s.cd}/${g.cd}/${k}`);
       }
+    }
+    // 복지용구 안내·사업소 페이지
+    urls.push(`${SITE}/tool`);
+    for (const s of regions) {
+      const gs = s.sggs.filter((g) => tcnt.get(`${s.cd}-${g.cd}`));
+      if (!gs.length) continue;
+      urls.push(`${SITE}/tool/${s.cd}`);
+      for (const g of gs) urls.push(`${SITE}/tool/${s.cd}/${g.cd}`);
     }
     const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((u) => `  <url><loc>${u}</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq></url>`).join("\n")}\n</urlset>\n`;
     res.setHeader("Content-Type", "application/xml; charset=utf-8");
