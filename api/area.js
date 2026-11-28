@@ -18,11 +18,11 @@ const KIND_DESC = {
   visit_bath: "목욕 장비를 갖춘 차량으로 댁에 찾아가 목욕을 돕는 서비스(방문목욕)",
   visit_nurse: "간호사 등이 댁으로 찾아가 간호·건강 관리를 하는 서비스(방문간호)",
 };
-const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-const num = (n) => (n == null ? "–" : Number(n).toLocaleString("ko-KR"));
+export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+export const num = (n) => (n == null ? "–" : Number(n).toLocaleString("ko-KR"));
 const pct = (a, b) => (b ? Math.round((a / b) * 1000) / 10 : null);
 // 받침에 따라 조사 고르기 (요양원은 / 주야간보호는)
-const jo = (w, a, b) => { const c = String(w).charCodeAt(String(w).length - 1) - 0xac00; return w + (c >= 0 && c <= 11171 && c % 28 ? a : b); };
+export const jo = (w, a, b) => { const c = String(w).charCodeAt(String(w).length - 1) - 0xac00; return w + (c >= 0 && c <= 11171 && c % 28 ? a : b); };
 const sum = (a, b) => (a == null && b == null ? null : (a || 0) + (b || 0));
 
 async function all(path, max = 25000) {
@@ -70,14 +70,16 @@ table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{border-bottom:1p
 .btn{display:inline-block;border:1px solid var(--main);border-radius:10px;padding:9px 14px;text-decoration:none;color:var(--main);font-weight:600}.btn.pri{background:var(--main);color:#fff}
 .chips{display:flex;flex-wrap:wrap;gap:6px}.chips a{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 11px;text-decoration:none;color:var(--ink);font-size:.88rem}.chips a.on{background:var(--main);border-color:var(--main);color:#fff}
 .g{display:inline-block;min-width:22px;text-align:center;border-radius:6px;padding:0 5px;font-weight:700;font-size:.82rem;background:#eee}.gA{background:#d7eadf;color:#1f5a3c}.gB{background:#e6f0ea}.gD,.gE{background:#f6dcd6;color:#8a2d1f}
-footer{color:var(--sub);font-size:.8rem;padding:24px 0 40px}`;
+footer{color:var(--sub);font-size:.8rem;padding:24px 0 40px}
+.kv th{width:32%;font-weight:600;color:var(--sub)}.badge{display:inline-block;background:var(--main-soft);color:var(--main);border-radius:8px;padding:2px 9px;font-size:.82rem;font-weight:700;margin-right:4px}.badge.w{background:var(--warm-soft);color:#9a5b00}
+ul.ck{padding-left:20px;margin:6px 0}ul.ck li{margin:3px 0}`;
 
-function page({ title, desc, canonical, crumbs, body }) {
+export function page({ title, desc, canonical, crumbs, body, ld2, robots }) {
   const ld = { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: crumbs.map((c, i) => ({ "@type": "ListItem", position: i + 1, name: c.nm, item: SITE + c.href })) };
   return `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><link rel="canonical" href="${SITE}${canonical}">
 <meta property="og:type" content="website"><meta property="og:site_name" content="케어온길"><meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}"><meta property="og:url" content="${SITE}${canonical}"><meta property="og:image" content="${SITE}/og.png">
-<link rel="icon" href="/favicon.png"><style>${CSS}</style><script type="application/ld+json">${JSON.stringify(ld)}</script>
+${robots ? `<meta name="robots" content="${robots}">` : ""}<link rel="icon" href="/favicon.png"><style>${CSS}</style><script type="application/ld+json">${JSON.stringify(ld2 ? [ld, ld2] : ld)}</script>
 <script defer src="/_vercel/insights/script.js"></script></head><body>
 <header><div class="wrap"><a href="/">케어온길</a></div></header>
 <main class="wrap"><nav class="crumb">${crumbs.map((c, i) => (i < crumbs.length - 1 ? `<a href="${c.href}">${esc(c.nm)}</a>` : esc(c.nm))).join(" › ")}</nav>${body}</main>
@@ -86,7 +88,7 @@ function page({ title, desc, canonical, crumbs, body }) {
 <p>주식회사 벤투런 · 대표 문창조 · 사업자등록번호 588-86-02083 · 031-818-6336</p></div></footer></body></html>`;
 }
 
-function send(res, code, html, cache = true) {
+export function send(res, code, html, cache = true) {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", cache ? "public, s-maxage=86400, stale-while-revalidate=604800" : "no-store");
   return res.status(code).send(html);
@@ -171,7 +173,7 @@ export default async function handler(req, res) {
     const rows = list.map((r) => {
       const now = sum(r.now_m, r.now_f), wait = sum(r.wait_m, r.wait_f), id = `${r.sym}:${r.pttn}`;
       const addr = String(r.addr || "").replace(S.nm, "").replace(G.nm, "").trim().split(" ").slice(0, 3).join(" ");
-      return `<tr><td><a href="/?sido=${sido}&sgg=${sgg}&kind=${kind}&inst=${encodeURIComponent(id)}">${esc(r.name)}</a><br><span class="muted">${esc(addr)}</span></td>${stay ? `<td class="n">${num(r.capacity)}</td><td class="n">${num(now)}</td><td class="n">${num(wait)}</td>` : ""}<td class="n">${/^[A-E]$/.test(r.eval_grade || "") ? `<span class="g g${r.eval_grade}">${r.eval_grade}</span>` : "–"}</td></tr>`;
+      return `<tr><td><a href="/inst/${r.sym}-${r.pttn}">${esc(r.name)}</a><br><span class="muted">${esc(addr)}</span></td>${stay ? `<td class="n">${num(r.capacity)}</td><td class="n">${num(now)}</td><td class="n">${num(wait)}</td>` : ""}<td class="n">${/^[A-E]$/.test(r.eval_grade || "") ? `<span class="g g${r.eval_grade}">${r.eval_grade}</span>` : "–"}</td></tr>`;
     }).join("");
     const more = local.n > list.length ? `<p class="muted">${num(local.n)}곳 중 ${list.length}곳만 보여 드립니다. 전체 목록과 비교는 케어온길에서 보실 수 있습니다.</p>` : "";
     const otherKinds = Object.entries(AREA_KINDS).filter(([k]) => cnt[k]).map(([k, n]) => `<a href="/area/${sido}/${sgg}/${k}"${k === kind ? ' class="on"' : ""}>${n} ${num(cnt[k])}</a>`).join("");
