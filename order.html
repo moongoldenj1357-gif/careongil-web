@@ -30,6 +30,7 @@ input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10
 .row span:first-child{color:var(--sub)}
 .copy{border:1px solid var(--line);background:#fff;border-radius:8px;padding:2px 8px;font-size:.8rem;cursor:pointer;margin-left:6px}
 .err{color:#b4472f}
+.note{background:#fdf6e8;border:1px solid #f0dfb8;border-radius:10px;padding:9px 12px;line-height:1.55}
 .ok{background:var(--main-soft);border-radius:12px;padding:12px 14px;margin:10px 0}
 .pm{display:flex;gap:6px;margin:12px 0 4px}
 .pm button{flex:1;border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px;font:inherit;cursor:pointer}
@@ -59,6 +60,9 @@ function lookupForm(msg = "") {
     location.href = "/order?t=" + encodeURIComponent(j.t);
   };
 }
+// 카드사 등록(심사)이 아직 끝나지 않은 카드. 모두 승인되면 "" 로 비우면 안내가 사라짐
+const CARD_PENDING = "KB국민·삼성·롯데";
+const cardNote = () => CARD_PENDING ? `<p class="note" style="font-size:.88rem;margin:10px 0">💳 <b>${CARD_PENDING}카드</b>는 카드사 등록을 마무리하는 중이라 지금은 결제가 되지 않을 수 있습니다. 그 밖의 카드(BC·신한·현대·농협·우리·하나), 간편결제, 계좌 입금은 바로 이용하실 수 있습니다.</p>` : "";
 async function load() {
   const r = await fetch("/api/order?t=" + encodeURIComponent(t));
   const o = await r.json().catch(() => ({}));
@@ -71,7 +75,7 @@ async function load() {
     <div class="row"><span>신청일</span><span>${new Date(o.created_at).toLocaleString("ko-KR")}</span></div>
     <div class="steps"><div class="on">① 신청 접수</div><div class="${st === "requested" || st === "paid" ? "on" : ""}">② 결제 확인</div><div class="${done ? "on" : ""}">③ 발행 완료</div></div>`;
   const q = new URLSearchParams(location.search);
-  if (q.get("payerr") || q.get("payfail")) h += `<p class="err">결제가 완료되지 않았습니다. ${esc(q.get("payerr") || q.get("message") || "")} 다시 시도하시거나 계좌 입금을 이용해 주세요.</p>`;
+  if (q.get("payerr") || q.get("payfail")) h += `<p class="err">결제가 완료되지 않았습니다. ${(q.get("payerr") || q.get("message")) ? `(${esc(q.get("payerr") || q.get("message"))}) ` : ""}다시 시도하시거나 계좌 입금을 이용해 주세요.${CARD_PENDING ? ` ${CARD_PENDING}카드는 카드사 등록을 마무리하는 중이라 결제가 안 될 수 있으니, 다른 카드나 간편결제·계좌 입금으로 결제해 주세요. 돈은 빠져나가지 않았습니다.` : ""}</p>`;
   const rcp = o.pay_receipt ? ` <a href="${esc(o.pay_receipt)}" target="_blank" rel="noopener">카드 영수증 보기</a>` : "";
   if (st === "canceled") h += `<p class="err">이 신청은 취소되었습니다.${o.pay_method === "toss" && o.paid_at ? " 카드 결제는 취소(환불) 처리되었습니다. 카드사에 따라 3~7영업일 뒤 반영됩니다." : ""} 궁금하신 점은 031-818-6336으로 연락 주세요.</p>`;
   else if (done) h += `${q.get("paid") ? `<div class="ok">✅ 결제가 완료되었습니다.</div>` : ""}<p><b>보고서가 발행되었습니다.</b> 아래 버튼으로 보시고, 'PDF로 저장'을 누르시면 파일로 보관하실 수 있습니다.${rcp}</p><a class="btn" href="/report?t=${encodeURIComponent(t)}">📄 보고서 보기</a><p class="muted" style="margin-top:10px">💬 보고서 맨 아래 <b>'보고서 풀이 · AI에게 묻기'</b>에서 숫자의 뜻이나 해석을 무료로 물어보실 수 있습니다.</p>`;
@@ -90,7 +94,7 @@ async function load() {
       <p class="muted" style="font-size:.85rem;margin:8px 0 0">금액이 다르거나 기한이 지나면 입금되지 않습니다. 기한이 지났다면 031-818-6336으로 연락 주세요.</p></div>`;
     else if (o.toss) h += `<h2 style="font-size:1.05rem;margin:16px 0 0">결제 방법</h2>
       <div class="pm"><button data-pm="toss" class="on">💳 카드·간편결제</button><button data-pm="bank">🏦 계좌 입금</button></div>
-      <div id="pmToss"><div class="row"><span>결제하실 금액</span><b>${won(o.amount)}</b></div>
+      <div id="pmToss">${cardNote()}<div class="row"><span>결제하실 금액</span><b>${won(o.amount)}</b></div>
         <div id="payment-method"></div><div id="agreement"></div>
         <button class="btn" id="payGo" disabled>${won(o.amount)} 결제하기</button>
         <p class="err" id="payErr"></p>
@@ -133,7 +137,7 @@ async function initToss(o) {
           successUrl: location.origin + "/api/pay?t=" + encodeURIComponent(t),
           failUrl: location.origin + "/order?t=" + encodeURIComponent(t) + "&payfail=1",
         });
-      } catch (e) { $("#payErr").textContent = e.code === "USER_CANCEL" ? "결제를 취소하셨습니다." : (e.message || "결제를 진행하지 못했습니다"); }
+      } catch (e) { $("#payErr").textContent = e.code === "USER_CANCEL" ? "결제를 취소하셨습니다." : (e.message || "결제를 진행하지 못했습니다") + (CARD_PENDING ? ` · ${CARD_PENDING}카드는 등록 마무리 중이라 결제가 안 될 수 있습니다. 다른 카드나 계좌 입금을 이용해 주세요.` : ""); }
     };
   } catch (e) {
     $("#payErr").textContent = (e.message || "결제창을 불러오지 못했습니다") + " · 계좌 입금으로도 신청하실 수 있습니다.";
