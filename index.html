@@ -700,7 +700,7 @@ async function shareLink({ title, desc, url, btnTitle }, btn) {
 }
 function shareInst(r, btn) {
   const desc = [r.kind_nm, r.addr ? cleanAddr(r.addr).split(" ").slice(0, 3).join(" ") : "", r.eval_grade ? `기관평가 ${r.eval_grade}등급` : ""].filter(Boolean).join(" · ");
-  return shareLink({ title: r.name, desc, url: location.origin + "/?inst=" + encodeURIComponent(r.id) }, btn);
+  return shareLink({ title: r.name, desc, url: location.origin + "/inst/" + String(r.id).replace(":", "-") }, btn);
 }
 function shareCompare(rows, btn) {
   const names = rows.map((r) => r.name + (r.eval_grade ? `(${r.eval_grade})` : "")).join(" · ");
