@@ -91,7 +91,12 @@ export default async function handler(req, res) {
     let h = `<div class="panel"><p style="margin:0 0 6px"><span class="badge">${esc(KN)}</span>${subNm ? `<span class="badge">${esc(subNm)}</span>` : ""}${dem ? `<span class="badge">치매전담실 ${dem}곳</span>` : ""}${grade ? `<span class="badge">기관평가 ${grade}${r.eval_year ? ` (${r.eval_year})` : ""}</span>` : ""}</p>
       <h1>${esc(r.name)}</h1><p class="muted" style="margin:0">${esc(r.addr || place)}${r.addr_detail ? ` ${esc(r.addr_detail)}` : ""}</p>
       ${stale ? `<p class="signal" style="margin-top:10px">최근 공단 기관 목록에서 확인되지 않은 기관입니다. 운영 여부를 기관이나 공단에 꼭 확인해 주세요.</p>` : ""}
-      <div class="btns">${r.tel ? `<a class="btn pri" href="tel:${esc(r.tel.replace(/[^\d-]/g, ""))}">📞 ${esc(r.tel)}</a>` : ""}<a class="btn" href="${esc(compare)}">케어온길에서 비교하기</a>${r.addr ? `<a class="btn" href="https://map.kakao.com/link/search/${encodeURIComponent(r.addr)}" target="_blank" rel="noopener">지도 보기</a>` : ""}${site(r.homepage) ? `<a class="btn" href="${esc(site(r.homepage))}" target="_blank" rel="noopener nofollow">홈페이지</a>` : ""}</div></div>`;
+      <div class="btns">${r.tel ? `<a class="btn pri" href="tel:${esc(r.tel.replace(/[^\d-]/g, ""))}">📞 ${esc(r.tel)}</a>` : ""}<a class="btn" href="${esc(compare)}">케어온길에서 비교하기</a>${r.addr ? `<a class="btn" href="https://map.kakao.com/link/search/${encodeURIComponent(r.addr)}" target="_blank" rel="noopener">지도 보기</a>` : ""}${site(r.homepage) ? `<a class="btn" href="${esc(site(r.homepage))}" target="_blank" rel="noopener nofollow">홈페이지</a>` : ""}<button class="btn" type="button" id="kshare" style="background:#fee500;border-color:#fee500;color:#191919;cursor:pointer;font:inherit;font-weight:600">카카오톡으로 공유</button></div></div>`;
+    // 공유: 카카오톡(키는 /api/config) → 안 되면 휴대폰 공유 창 → 링크 복사
+    const shareDesc = [subNm || KN, sggNm || sidoNm, grade ? `기관평가 ${grade}등급` : "", stay && r.capacity != null ? `정원 ${r.capacity}명${wait ? `·대기 ${wait}명` : ""}` : ""].filter(Boolean).join(" · ");
+    const shareJs = `<script>(function(){var b=document.getElementById("kshare");if(!b)return;var T=${JSON.stringify(r.name)},D=${JSON.stringify(shareDesc)},U=location.origin+${JSON.stringify(canonical)};
+function fb(){if(navigator.share){navigator.share({title:T,text:D,url:U}).catch(function(){});return;}if(navigator.clipboard){navigator.clipboard.writeText(U).then(function(){b.textContent="✓ 링크를 복사했습니다";});}else{prompt("아래 링크를 복사해 주세요",U);}}
+b.onclick=function(){fetch("/api/config").then(function(r){return r.json();}).then(function(c){var k=c.kakaoShareKey||c.kakaoJsKey;if(!k)throw 0;return new Promise(function(ok,no){if(window.Kakao&&Kakao.Share){if(!Kakao.isInitialized())Kakao.init(k);return ok();}var s=document.createElement("script");s.src="https://t1.kakaocdn.net/kakao_js_sdk/2.8.1/kakao.min.js";s.onload=function(){try{if(!Kakao.isInitialized())Kakao.init(k);ok();}catch(e){no(e);}};s.onerror=no;document.head.appendChild(s);});}).then(function(){Kakao.Share.sendDefault({objectType:"feed",content:{title:T,description:D,imageUrl:location.origin+"/og.png",imageWidth:1200,imageHeight:630,link:{mobileWebUrl:U,webUrl:U}},buttons:[{title:"케어온길에서 보기",link:{mobileWebUrl:U,webUrl:U}}]});}).catch(fb);};})();</script>`;
 
     // 한눈에
     const stats = stay ? [
@@ -154,7 +159,7 @@ export default async function handler(req, res) {
 
     const crumbs = [{ nm: "케어온길", href: "/" }, { nm: "지역별 현황", href: "/area" }, { nm: sidoNm || "시·도", href: `/area/${r.sido_cd}` },
       ...(sggNm ? [{ nm: `${sggNm} ${KN}`, href: `/area/${r.sido_cd}/${r.sgg_cd}/${r.kind}` }] : []), { nm: r.name, href: canonical }];
-    return send(res, 200, page({ title, desc, canonical, crumbs, body: h, ld2, robots: stale ? "noindex" : null }));
+    return send(res, 200, page({ title, desc, canonical, crumbs, body: h + shareJs, ld2, robots: stale ? "noindex" : null }));
   } catch (e) {
     return send(res, 500, page({ title: "잠시 후 다시 시도해 주세요 | 케어온길", desc: "", canonical: "/area", robots: "noindex", crumbs: [{ nm: "케어온길", href: "/" }], body: `<div class="panel"><h1>잠시 후 다시 시도해 주세요</h1><p class="muted">${esc(e.message).slice(0, 120)}</p></div>` }), false);
   }
