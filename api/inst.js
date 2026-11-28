@@ -14,6 +14,36 @@ const won = (n) => (n == null || n === "" ? "–" : `${Number(n).toLocaleString(
 const site = (u) => { const h = String(u || "").replace(/^https?:\/\//i, "").trim(); return /\.[a-z가-힣]{2,}/i.test(h) ? (/^https?:/i.test(u) ? u : "http://" + h) : null; };
 const gBadge = (g) => (/^[A-E]$/.test(g || "") ? `<span class="g g${g}">${g}</span>` : "–");
 const median = (a) => { const v = a.filter((x) => x != null && isFinite(x)).sort((x, y) => x - y); if (!v.length) return null; const m = (v.length - 1) / 2; return (v[Math.floor(m)] + v[Math.ceil(m)]) / 2; };
+// 2026년 장기요양 수가 (index.html 계산기와 같은 값 — 해마다 1월에 함께 바꿈)
+const FEE = { home: { 1: 93070, 2: 86340, 3: 81540 }, group: { 1: 74590, 2: 69210, 3: 63800 },
+  short: { 1: 74060, 2: 68580, 3: 63350, 4: 61680, 5: 60000 }, day: { 1: 69730, 2: 64590, 3: 59640, 4: 58010, 5: 56360, c: 56360 } };
+const LIMIT = { 1: 2512900, 2: 2331200, 3: 1528200, 4: 1409700, 5: 1208900, c: 676320 };
+const r10 = (x) => Math.round(x / 10) * 10;
+// 신고된 식재료비(1식) × 하루 끼니 수(산출근거에서, 없으면 기본값)
+function foodPerDay(r, defMeals) {
+  const f = (Array.isArray(r.nonpay) ? r.nonpay : []).find((x) => x.종류 === "식재료비");
+  if (!f || !f.금액 || f.금액 > 30000) return null;
+  const m = String(f.근거 || "").replace(/\s/g, "").match(/[xX×*](\d)식/);
+  const n = m ? +m[1] : defMeals;
+  return f.금액 * (n >= 1 && n <= 5 ? n : defMeals);
+}
+function costPanel(r, subNm) {
+  const home = r.kind === "home", day = r.kind === "daycare";
+  const fd = foodPerDay(r, day ? 1 : 3), days = home ? 30 : day ? 20 : 10;
+  const grades = home ? [["1", "1등급"], ["2", "2등급"], ["3", "3~5등급"]] : [["1", "1등급"], ["2", "2등급"], ["3", "3등급"], ["4", "4등급"], ["5", "5등급"], ...(day ? [["c", "인지지원등급"]] : [])];
+  const fac = home && /공동생활가정/.test(subNm || "") ? "group" : "home";
+  const rows = grades.map(([g, nm]) => {
+    const fee = home ? FEE[fac][g] : day ? FEE.day[g] : FEE.short[g];
+    const total = fee * days, inLim = home ? total : Math.min(total, LIMIT[g]);
+    const mine = inLim * (home ? 0.2 : 0.15) + (total - inLim), food = fd ? fd * days : 0;
+    return `<tr><td>${nm}</td><td class="n">${won(r10(mine))}</td><td class="n">${fd ? won(r10(food)) : "–"}</td><td class="n"><b>${won(r10(mine + food))}</b></td></tr>`;
+  }).join("");
+  const basis = home ? "30일 입소" : day ? "하루 8~10시간 × 한 달 20일" : "10일 이용";
+  return `<div class="panel"><h2>이 기관 ${home ? "한 달" : day ? "한 달" : "10일"} 예상 비용</h2>
+    <p class="muted" style="margin:0 0 8px">${basis} · 일반 본인부담(${home ? "20%" : "15%"}) 기준 · ${fd ? `식비는 이 기관이 신고한 하루 ${won(fd)}` : "이 기관은 식재료비 신고가 없어 식비 제외"}</p>
+    <div class="tbl"><table><tr><th>등급</th><th class="n">급여 본인부담</th><th class="n">${day ? "식사비" : "식재료비"}</th><th class="n">합계</th></tr>${rows}</table></div>
+    <p class="muted">2026년 장기요양 수가로 계산한 어림값입니다. 감경 대상(본인부담 40·60% 감경, 기초생활수급자)은 더 적게 내시며, 가산·감산과 이미용비·간식비·상급침실료 같은 기타 비용은 빠져 있습니다.${home ? " 3~5등급은 공단이 시설급여를 인정한 경우에만 입소하실 수 있습니다." : ""} 등급·감경을 바꿔 보시려면 <a href="${`/?sido=${r.sido_cd}&sgg=${r.sgg_cd}&kind=${r.kind}&inst=${encodeURIComponent(`${r.sym}:${r.pttn}`)}`}">케어온길에서 이 기관 열기</a>를 눌러 주세요.</p></div>`;
+}
 const STAFF_GROUPS = [["직접 돌봄", ["요양보호사", "요양보호사유예"]], ["간호", ["간호사", "간호조무사"]], ["재활", ["물리치료사", "작업치료사"]],
   ["상담·관리", ["시설장", "사회복지사", "사무국장", "사무원"]], ["식사·위생", ["영양사", "조리원", "위생원"]], ["그 밖에", ["의사", "관리인", "보조원", "기타"]]];
 
@@ -83,8 +113,9 @@ export default async function handler(req, res) {
       : `<p>${grade ? `최근 평가 ${gBadge(grade)}${r.eval_year ? ` (${r.eval_year})` : ""}` : "아직 평가 결과가 없습니다. 새로 문을 연 기관은 첫 정기평가 전까지 등급이 없습니다."}</p>`}
       <p class="muted">공단이 서비스 종류별로 약 3년마다 하는 평가로 A(최우수)~E(미흡)로 나뉩니다. 어르신의 장기요양등급(1~5등급)과는 다릅니다.</p></div>`;
 
-    // 비급여
+    // 한 달 예상 비용 + 비급여
     if (stay) {
+      h += costPanel(r, subNm);
       const np = Array.isArray(r.nonpay) ? r.nonpay : [];
       h += `<div class="panel"><h2>본인이 따로 내는 비용 (비급여)</h2>${np.length ? `<table class="kv">${np.map((x) => `<tr><th>${esc(x.종류)}</th><td><b>${won(x.금액)}</b>${x.근거 ? ` <span class="muted">(${esc(String(x.근거).replace(/^\((.*)\)$/, "$1"))})</span>` : ""}</td></tr>`).join("")}</table>
         <p class="muted">기관이 공단에 신고한 금액입니다. 식재료비는 보통 1식(한 끼) 금액이고, 상급침실사용료는 하루 금액입니다. 장기요양 급여의 본인부담(${r.kind === "home" ? "요양원 20%" : "재가 15%"}, 감경 대상은 더 적음)은 이와 별도입니다.</p>`
