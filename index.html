@@ -72,6 +72,7 @@ table.tbl{border-collapse:collapse;width:100%}table.tbl th,table.tbl td{border-b
 input.in{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff}
 .result{margin-top:18px;border-top:2px solid var(--main);padding-top:12px}
 .big{display:flex;justify-content:space-between;align-items:baseline;background:var(--main-soft);border-radius:12px;padding:14px 16px;margin-bottom:8px}
+.cbox{border:1px solid var(--line);border-radius:12px;padding:12px;margin:6px 0 10px}.cbin{display:flex;flex-wrap:wrap;gap:8px 14px;margin-bottom:10px;font-size:.9rem}.cbin select,.cbin input{margin-left:4px;padding:4px 6px;border:1px solid var(--line);border-radius:8px;font:inherit}.cbin input{width:64px}
 .big small{color:var(--main)}.big b{font-size:1.6rem;color:var(--main)}
 b.bad{color:var(--bad)}
 .meta{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:22px 0 10px;flex-wrap:wrap}
@@ -632,9 +633,9 @@ function extraHtml(r) {
   if (!r.extra_at) return `<p class="muted" style="margin-top:14px">비용·인력·시설 정보는 수집 중입니다. 며칠 안에 채워질 예정입니다.</p>`;
   const np = Array.isArray(r.nonpay) ? r.nonpay : [];
   const pg = Array.isArray(r.programs) ? r.programs : [];
-  return `
+  return `${costBox(r)}
     <h4 class="sec">본인이 따로 내는 비용 (비급여)</h4>
-    ${np.length ? `<table class="kv">${np.map((x) => `<tr><th>${esc(x.종류)}</th><td><b>${won(x.금액)}</b>${x.근거 ? ` <span class="muted">(${esc(x.근거)})</span>` : ""}${x.등록일 ? `<br><span class="muted">신고일 ${esc(x.등록일)}</span>` : ""}</td></tr>`).join("")}</table>
+    ${np.length ? `<table class="kv">${np.map((x) => `<tr><th>${esc(x.종류)}</th><td><b>${won(x.금액)}</b>${x.근거 ? ` <span class="muted">(${esc(String(x.근거).replace(/^\((.*)\)$/, "$1"))})</span>` : ""}${x.등록일 ? `<br><span class="muted">신고일 ${esc(x.등록일)}</span>` : ""}</td></tr>`).join("")}</table>
       <p class="muted">기관이 공단에 신고한 금액입니다. 식재료비는 보통 1식(한 끼) 금액이고, 하루 몇 끼인지는 괄호 안의 산출근거에서 보실 수 있습니다. 상급침실사용료는 하루 금액이며, 여러 개일 때 어느 방(1인실·2인실 등)의 금액인지는 시설에 확인해 주세요.</p>`
       : `<p class="muted">신고된 비급여 항목이 없습니다.</p>`}
     ${staffHtml(r)}
@@ -771,6 +772,7 @@ async function openDetail(id) {
         <button class="btn kshare" type="button" id="shareKakao">카카오톡으로 공유</button></div>
       <p class="note">빈자리는 정원에서 현원을 뺀 추정값입니다. 실제 입소 가능 여부와 비용은 기관에 전화로 확인해 보시길 권해 드립니다.</p>`);
     const tc = $("#toCalc"); if (tc) tc.onclick = () => toCalc(r);
+    if ($("#cbox")) { costCalc(r); $("#cbox").addEventListener("input", () => costCalc(r)); $("#cbMore").onclick = () => toCalc(r, $("#cbG").value, $("#cbR").value); }
     $("#askAi").onclick = () => openChat([r]);
     $("#shareKakao").onclick = (e) => shareInst(r, e.currentTarget);
     const cc = $("#copyCall");
@@ -920,14 +922,65 @@ function foodPerDay(r, defMeals) {
   const n = m ? +m[1] : defMeals;
   return n >= 1 && n <= 5 ? f.금액 * n : f.금액 * defMeals;
 }
-function toCalc(r) {
+function toCalc(r, g, rt) {
   const stay = r.kind === "home";
   $(`#cMode [data-m="${stay ? "stay" : "home"}"]`).click();
   if (stay) {
-    if (r.sub_nm === "공동생활가정") $("#cFac").value = "group";
+    $("#cFac").value = /공동생활가정/.test(r.sub_nm || "") ? "group" : "home";
     $("#cFood").value = foodPerDay(r, 3) ?? "";
-  } else if (r.kind === "daycare") { $("#cDayN").value = 20; $("#cMeal").value = foodPerDay(r, 1) ?? ""; }
+  } else if (r.kind === "daycare") { $("#cDayN").value = $("#cbD")?.value || 20; $("#cMeal").value = foodPerDay(r, 1) ?? ""; }
+  else if (r.kind === "short") { $("#cShortN").value = $("#cbD")?.value || 10; }
+  if (g && [...$("#cGrade").options].some((o) => o.value === g)) $("#cGrade").value = g;
+  if (rt != null) $("#cRate").value = rt;
   calc(); dlg.close(); go("calc");
+}
+// ---------- 기관 상세: 이 기관 한 달 예상 비용 (2026년 수가 + 이 기관이 신고한 식재료비) ----------
+// 요양원 30일 · 주야간보호 8~10시간 × 이용일 · 단기보호 × 이용일. 가산·감산과 이미용비·간식비 같은 기타 비급여는 뺌
+function roomFees(r) {
+  const v = (r.nonpay || []).filter((x) => /침실/.test(x.종류 || "") && !/월/.test(x.근거 || "")).map((x) => +x.금액 || 0).filter((x) => x >= 1000 && x <= 150000);
+  return v.length ? [Math.min(...v), Math.max(...v)] : null;
+}
+function costBox(r) {
+  if (!STAY.has(r.kind)) return "";
+  const home = r.kind === "home";
+  const grades = home ? [["1", "1등급"], ["2", "2등급"], ["3", "3~5등급"]] : [["1", "1등급"], ["2", "2등급"], ["3", "3등급"], ["4", "4등급"], ["5", "5등급"], ...(r.kind === "daycare" ? [["c", "인지지원"]] : [])];
+  const def = home ? "1" : "3";
+  return `<h4 class="sec">이 기관 한 달 예상 비용</h4>
+    <div class="cbox" id="cbox">
+      <div class="cbin"><label>어르신 등급 <select id="cbG">${grades.map(([k, n]) => `<option value="${k}" ${k === def ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+        <label>본인부담 <select id="cbR"><option value="0">일반</option><option value="40">감경 40%</option><option value="60">감경 60%</option><option value="100">기초생활수급자</option></select></label>
+        ${home ? "" : `<label>${r.kind === "daycare" ? "한 달 이용일" : "이용 일수"} <input id="cbD" type="number" min="1" max="31" value="${r.kind === "daycare" ? 20 : 10}"></label>`}</div>
+      <div id="cbOut"></div>
+      <button class="btn" type="button" id="cbMore">자세히 계산하기 ›</button>
+    </div>`;
+}
+function costCalc(r) {
+  const out = $("#cbOut"); if (!out) return;
+  const g = $("#cbG").value, rk = $("#cbR").value, home = r.kind === "home";
+  const rate = RATE[home ? "stay" : "home"][rk];
+  const rows = []; let mine = 0, food = 0, note = "";
+  if (home) {
+    const fac = /공동생활가정/.test(r.sub_nm || "") ? "group" : "home", fee = FEE[fac][g], days = 30;
+    mine = fee * days * rate;
+    rows.push(["급여 본인부담", `${W(mine)} <span class="muted">(하루 ${W(fee)} × 30일 × ${Math.round(rate * 100)}%)</span>`]);
+    const fd = foodPerDay(r, 3); if (fd) { food = fd * days; rows.push(["식재료비", `${W(food)} <span class="muted">(하루 ${W(fd)} × 30일, 기관 신고)</span>`]); }
+    if (g === "3") note = "3~5등급은 공단이 시설급여를 인정한 경우에만 입소하실 수 있습니다. ";
+  } else {
+    const days = Math.min(31, Math.max(1, Number($("#cbD").value) || 1));
+    const fee = r.kind === "daycare" ? FEE.day["8~10시간"][g] : FEE.short[g === "c" ? 5 : g];
+    const total = fee * days, lim = LIMIT[g], inLim = Math.min(total, lim), over = total - inLim;
+    mine = inLim * rate + over;
+    rows.push(["급여 본인부담", `${W(mine)} <span class="muted">(하루 ${W(fee)}${r.kind === "daycare" ? "·8~10시간" : ""} × ${days}일 × ${Math.round(rate * 100)}%)</span>`]);
+    if (over) rows.push(["월 한도 넘은 금액", `<b class="bad">${W(over)}</b> <span class="muted">전액 본인부담(위에 포함)</span>`]);
+    const fd = foodPerDay(r, r.kind === "daycare" ? 1 : 3); if (fd) { food = fd * days; rows.push([r.kind === "daycare" ? "식사비" : "식재료비", `${W(food)} <span class="muted">(하루 ${W(fd)} × ${days}일, 기관 신고)</span>`]); }
+    note = "다른 재가 서비스(방문요양 등)를 함께 쓰시면 월 한도를 나눠 씁니다. ";
+  }
+  if (!food) note += "이 기관은 식재료비 신고가 없어 식비가 빠져 있습니다. ";
+  const rf = roomFees(r);
+  if (rf && r.kind !== "daycare") rows.push(["상급침실(선택)", `하루 ${W(rf[0])}${rf[1] > rf[0] ? `~${W(rf[1])}` : ""} 추가 <span class="muted">(1·2인실 등을 원하실 때)</span>`]);
+  out.innerHTML = `<div class="big"><small>${r.kind === "short" ? `${$("#cbD").value}일 이용 시 약` : "한 달 약"}</small><b>${W(mine + food)}</b></div>
+    <table class="kv">${rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join("")}</table>
+    <p class="muted" style="margin:6px 0 0">${note}2026년 수가와 이 기관이 공단에 신고한 비급여로 계산한 어림값입니다. 가산·감산, 이미용비·간식비 같은 기타 비용은 빠져 있으니 기관에 꼭 확인해 주세요.</p>`;
 }
 
 // ---------- 화면 전환 (찾기 · 이용 안내 · 비용 계산) ----------
