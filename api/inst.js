@@ -21,11 +21,11 @@ const LIMIT = { 1: 2512900, 2: 2331200, 3: 1528200, 4: 1409700, 5: 1208900, c: 6
 const r10 = (x) => Math.round(x / 10) * 10;
 // 신고된 식재료비(1식) × 하루 끼니 수(산출근거에서, 없으면 기본값)
 function foodPerDay(r, defMeals) {
-  const f = (Array.isArray(r.nonpay) ? r.nonpay : []).find((x) => x.종류 === "식재료비");
-  if (!f || !f.금액 || f.금액 > 30000) return null;
-  const m = String(f.근거 || "").replace(/\s/g, "").match(/[xX×*](\d)식/);
-  const n = m ? +m[1] : defMeals;
-  return f.금액 * (n >= 1 && n <= 5 ? n : defMeals);
+  const meals = (f) => { const m = String(f.근거 || "").replace(/\s/g, "").match(/[xX×*](\d)식/); const n = m ? +m[1] : defMeals; return n >= 1 && n <= 5 ? n : defMeals; };
+  const c = (Array.isArray(r.nonpay) ? r.nonpay : []).filter((x) => x.종류 === "식재료비" && +x.금액 > 0 && +x.금액 <= 30000);
+  if (!c.length) return null;
+  const f = c.find((x) => meals(x) === defMeals) || c[0];
+  return +f.금액 * meals(f);
 }
 function costPanel(r, subNm) {
   const home = r.kind === "home", day = r.kind === "daycare";
@@ -116,9 +116,9 @@ export default async function handler(req, res) {
     // 한 달 예상 비용 + 비급여
     if (stay) {
       h += costPanel(r, subNm);
-      const np = Array.isArray(r.nonpay) ? r.nonpay : [];
+      const seen = new Set(), np = (Array.isArray(r.nonpay) ? r.nonpay : []).filter((x) => { const k = [x.종류, x.금액, x.근거].join("|"); if (seen.has(k)) return false; seen.add(k); return true; });
       h += `<div class="panel"><h2>본인이 따로 내는 비용 (비급여)</h2>${np.length ? `<table class="kv">${np.map((x) => `<tr><th>${esc(x.종류)}</th><td><b>${won(x.금액)}</b>${x.근거 ? ` <span class="muted">(${esc(String(x.근거).replace(/^\((.*)\)$/, "$1"))})</span>` : ""}</td></tr>`).join("")}</table>
-        <p class="muted">기관이 공단에 신고한 금액입니다. 식재료비는 보통 1식(한 끼) 금액이고, 상급침실사용료는 하루 금액입니다. 장기요양 급여의 본인부담(${r.kind === "home" ? "요양원 20%" : "재가 15%"}, 감경 대상은 더 적음)은 이와 별도입니다.</p>`
+        <p class="muted">기관이 공단에 신고한 금액입니다. 식재료비는 보통 1식(한 끼) 금액이고, 여러 줄이면 일반식·경관식(콧줄)·간식처럼 어르신에 따라 다른 금액인 경우가 많습니다(예상 비용은 하루 3끼 기준). 상급침실사용료는 하루 금액입니다. 장기요양 급여의 본인부담(${r.kind === "home" ? "요양원 20%" : "재가 15%"}, 감경 대상은 더 적음)은 이와 별도입니다.</p>`
         : `<p class="muted">${r.extra_at ? "신고된 비급여 항목이 없습니다." : "비용 정보는 수집 중입니다."}</p>`}</div>`;
     }
 
